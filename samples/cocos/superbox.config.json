@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "title": "Cocos 샘플",
+  "orientation": "portrait",
+  "loading": {
+    "backgroundColor": "#0F1A1C",
+    "primaryColor": "#14B8A6",
+    "tips": ["첫 씬과 자원을 받는 동안 이 화면이 덮어 줘요"]
+  }
+}

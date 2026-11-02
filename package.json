@@ -1,0 +1,48 @@
+{
+  "name": "superbox-play-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "슈퍼박스 플레이 게임 도구 — 패키지 CLI · Play SDK 타입 · Phaser 플러그인 · Cocos Creator 확장",
+  "type": "module",
+  "license": "UNLICENSED",
+  "repository": "github:SuperboxINC/superbox-play-sdk",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "bin": {
+    "superbox-play": "packages/cli/dist/cli.js"
+  },
+  "main": "./packages/sdk/dist/index.js",
+  "types": "./packages/sdk/dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./packages/sdk/dist/types/index.d.ts",
+      "default": "./packages/sdk/dist/index.js"
+    },
+    "./phaser": {
+      "types": "./packages/phaser/dist/types/index.d.ts",
+      "default": "./packages/phaser/dist/index.js"
+    },
+    "./phaser/global": "./packages/phaser/dist/superbox-play-phaser.js",
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "phaser": ["packages/phaser/dist/types/index.d.ts"]
+    }
+  },
+  "files": [
+    "packages/cli/dist",
+    "packages/sdk/dist",
+    "packages/phaser/dist",
+    "engines/cocos-creator/superbox-play"
+  ],
+  "peerDependencies": {
+    "phaser": ">=3.60.0 <5"
+  },
+  "peerDependenciesMeta": {
+    "phaser": {
+      "optional": true
+    }
+  }
+}

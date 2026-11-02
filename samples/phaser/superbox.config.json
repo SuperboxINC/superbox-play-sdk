@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "title": "Phaser 샘플",
+  "orientation": "portrait",
+  "engine": "phaser",
+  "loading": {
+    "backgroundColor": "#14101F",
+    "primaryColor": "#8B5CF6",
+    "tips": ["씬이 바뀌어도 로딩 막대는 뒤로 가지 않아요"]
+  }
+}

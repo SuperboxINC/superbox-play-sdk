@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "title": "HTML5 샘플",
+  "orientation": "portrait",
+  "loading": {
+    "backgroundColor": "#101522",
+    "primaryColor": "#3D7BFD",
+    "tips": ["광고를 끝까지 보면 보상을 받아요", "한 판을 끝내면 미션이 쌓여요", "결제는 샌드박스에서 흉내만 내요"]
+  },
+  "runtime": {
+    "earlyFetch": true,
+    "maxDevicePixelRatio": "auto",
+    "watchdog": true,
+    "debugConsole": false
+  }
+}

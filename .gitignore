@@ -1,0 +1,16 @@
+node_modules/
+*.sbp
+
+# 샘플을 돌리면 생기는 것
+samples/*/dist/
+samples/*/package-lock.json
+samples/html5/public/assets/
+samples/phaser/public/assets/
+samples/cocos/build/
+samples/cocos/library/
+samples/cocos/local/
+samples/cocos/temp/
+samples/cocos/profiles/
+samples/cocos/extensions/
+samples/cocos/assets/resources/generated/
+samples/cocos/assets/resources/generated.meta

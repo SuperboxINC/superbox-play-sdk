@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>HTML5 샘플 — 슈퍼박스 플레이</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+    html, body { height: 100%; margin: 0; background: #101522; color: #f2f4f6; }
+    main { max-width: 480px; min-height: 100%; margin: 0 auto; padding: 24px 20px 40px; box-sizing: border-box; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    .status { margin: 0 0 16px; font-size: 13px; color: rgba(255, 255, 255, 0.62); }
+    .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 16px; }
+    .tiles img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; display: block; }
+    .wallet { display: flex; gap: 16px; margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); font-size: 14px; }
+    .wallet strong { font-variant-numeric: tabular-nums; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button { min-height: 48px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, 0.1); color: inherit; font: 600 14px/1 inherit; cursor: pointer; }
+    button.primary { background: #3d7bfd; color: #fff; }
+    ol { margin: 16px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.6; color: rgba(255, 255, 255, 0.62); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>HTML5 샘플</h1>
+    <p class="status" id="status" data-testid="status">게임존과 연결하는 중…</p>
+    <div class="tiles" id="tiles"></div>
+    <div class="wallet">
+      <span>젬 <strong id="gems" data-testid="gems">0</strong></span>
+      <span>광고 보상 <strong id="rewards" data-testid="rewards">0</strong></span>
+      <span>미션 <strong id="missions" data-testid="missions">0</strong></span>
+    </div>
+    <div class="grid">
+      <button class="primary" id="rewarded" data-testid="rewarded" type="button">보상형 광고</button>
+      <button id="interstitial" data-testid="interstitial" type="button">전면 광고</button>
+      <button id="buy" data-testid="buy" type="button">젬 300 구매</button>
+      <button id="mission" data-testid="mission" type="button">한 판 끝(미션)</button>
+    </div>
+    <ol id="log" data-testid="log"></ol>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>

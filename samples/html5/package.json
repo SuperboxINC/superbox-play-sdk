@@ -1,0 +1,12 @@
+{
+  "name": "superbox-play-sample-html5",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "엔진 없는 HTML5 게임 샘플 — SBPlayLoading 으로 진행률을 직접 알린다",
+  "scripts": {
+    "assets": "node make-assets.mjs",
+    "package": "node make-assets.mjs && node ../../packages/cli/dist/cli.js build public --out dist/html5-sample.sbp",
+    "dev": "node make-assets.mjs && node ../../packages/cli/dist/cli.js dev public"
+  }
+}

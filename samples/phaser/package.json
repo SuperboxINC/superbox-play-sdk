@@ -1,0 +1,17 @@
+{
+  "name": "superbox-play-sample-phaser",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phaser 샘플 — 같은 코드를 Phaser 3 · 4 로 각각 묶어 superbox-play-sdk/phaser 를 시험한다",
+  "scripts": {
+    "build": "node build.mjs",
+    "package": "node build.mjs && node ../../packages/cli/dist/cli.js build dist/phaser3 --out dist/phaser3-sample.sbp && node ../../packages/cli/dist/cli.js build dist/phaser4 --out dist/phaser4-sample.sbp",
+    "dev": "node build.mjs && node ../../packages/cli/dist/cli.js dev dist/phaser4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "phaser3": "npm:phaser@3.90.0",
+    "phaser4": "npm:phaser@4.2.1"
+  }
+}

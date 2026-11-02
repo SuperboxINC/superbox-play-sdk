@@ -81,8 +81,17 @@
     SBPlay.on('app.resume', function () { state.paused = false; state.resumed += 1; log('다시 시작'); });
   }
 
+  // 안전 영역 — top 에는 오른쪽 위 메뉴 버튼 자리가 들어 있다. 위쪽 UI 가 그 아래로 내려온다
+  function applySafeArea(insets) {
+    var main = document.querySelector('main');
+    main.style.paddingTop = (24 + insets.top) + 'px';
+    main.style.paddingBottom = (40 + insets.bottom) + 'px';
+  }
+
   bind();
+  SBPlay.on('safeArea.change', applySafeArea);
   SBPlay.init().then(function (session) {
+    applySafeArea(session.safeArea);
     $('status').textContent = '환경: ' + session.environment + ' · 플레이어: ' + (session.player.displayName || session.player.key);
     return SBPlay.store.pendingOrders();
   }).then(function (result) {

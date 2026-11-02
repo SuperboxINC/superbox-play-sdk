@@ -229,7 +229,7 @@ export type GameChannelMethod = keyof GameChannelMethods;
 /** 이벤트마다 data — game-channel.md 3장. */
 export interface GameChannelEvents {
     'app.pause': {
-        reason?: 'background' | 'ad' | 'payment';
+        reason?: 'background' | 'ad' | 'payment' | 'menu';
     };
     'app.resume': Record<string, never>;
     'safeArea.change': SafeArea;

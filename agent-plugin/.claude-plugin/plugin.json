@@ -1,0 +1,19 @@
+{
+  "name": "superbox-play",
+  "version": "0.2.0",
+  "description": "슈퍼박스 플레이 콘솔 MCP를 연결하고, 게임 등록부터 출시까지 도와줘요.",
+  "author": {
+    "name": "SUPERBOX Inc"
+  },
+  "homepage": "https://developers.superboxgo.com",
+  "repository": "https://github.com/SuperboxINC/superbox-play-sdk",
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": ["superbox-play", "game", "mcp", "unity", "cocos", "phaser", "html5"],
+  "skills": "./skills/",
+  "mcpServers": {
+    "superbox-play": {
+      "type": "http",
+      "url": "https://console.superboxgo.com/mcp"
+    }
+  }
+}

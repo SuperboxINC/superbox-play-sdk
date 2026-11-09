@@ -1,0 +1,14 @@
+{
+  "name": "superbox-play",
+  "description": "슈퍼박스 플레이에 게임을 올릴 때 쓰는 AI 도구 플러그인이에요.",
+  "owner": {
+    "name": "SUPERBOX Inc"
+  },
+  "plugins": [
+    {
+      "name": "superbox-play",
+      "source": "./agent-plugin",
+      "description": "콘솔 MCP를 연결하고, 시작 · 기능 붙이기 · 휴대폰 테스트 · 출시 점검을 도와줘요."
+    }
+  ]
+}

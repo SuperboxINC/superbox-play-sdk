@@ -210,7 +210,7 @@ export async function readPackage<TSlice extends BlobSliceLike>(blob: BlobLike<T
 
   const files = manifest.files.map((file) => {
     const { offset } = webEntries.get(file.path) as LocatedEntry;
-    return { ...file, offset, slice: () => blob.slice(offset, offset + file.size) };
+    return { ...file, offset, slice: (): TSlice => blob.slice(offset, offset + file.size) };
   });
   return {
     manifest,

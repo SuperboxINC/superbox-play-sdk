@@ -6,7 +6,32 @@
   "description": "web-mobile · web-desktop 빌드를 슈퍼박스 플레이 패키지(.sbp)로 묶고 게임 코드에서 SuperboxPlay 를 쓰게 한다",
   "author": "SUPERBOX",
   "editor": ">=3.8.0",
+  "main": "./dist/main.js",
   "contributions": {
+    "menu": [
+      {
+        "path": "Superbox Play",
+        "label": "Build & Package",
+        "message": "build-and-package"
+      },
+      {
+        "path": "Superbox Play",
+        "label": "Build & Package (Local Game Zone)",
+        "message": "build-and-package-for-local-zone"
+      }
+    ],
+    "messages": {
+      "build-and-package": {
+        "methods": [
+          "buildAndPackage"
+        ]
+      },
+      "build-and-package-for-local-zone": {
+        "methods": [
+          "buildAndPackageForLocalZone"
+        ]
+      }
+    },
     "builder": "./dist/builder.js",
     "asset-db": {
       "mount": {

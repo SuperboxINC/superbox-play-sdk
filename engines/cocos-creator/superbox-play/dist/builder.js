@@ -44,13 +44,13 @@ function readBuildOptions(packages) {
 var OPTIONS = {
   enabled: {
     label: "\uC288\uD37C\uBC15\uC2A4 \uD50C\uB808\uC774 \uD328\uD0A4\uC9C0 \uB9CC\uB4E4\uAE30",
-    description: "\uBE4C\uB4DC\uAC00 \uB05D\uB098\uBA74 build \uD3F4\uB354 \uC606\uC5D0 .sbp \uB97C \uB9CC\uB4ED\uB2C8\uB2E4.",
+    description: "\uBE4C\uB4DC\uAC00 \uB05D\uB098\uBA74 build \uD3F4\uB354 \uC606\uC5D0 .sbp\uB97C \uB9CC\uB4E4\uC5B4\uC694.",
     default: true,
     render: { ui: "ui-checkbox" }
   },
   zone: {
-    label: "\uAC8C\uC784\uC874 \uCD9C\uCC98",
-    description: "\uAE30\uBCF8\uC740 \uC6B4\uC601 \uAC8C\uC784\uC874\uC785\uB2C8\uB2E4. \uB85C\uCEEC \uC2DC\uD5D8\uC740 http://localhost:8200 \uC744 \uB123\uC2B5\uB2C8\uB2E4.",
+    label: "\uAC8C\uC784\uC874 \uC8FC\uC18C",
+    description: "\uAE30\uBCF8\uC740 \uC6B4\uC601 \uAC8C\uC784\uC874\uC774\uC5D0\uC694. \uB85C\uCEEC\uC5D0\uC11C \uD14C\uC2A4\uD2B8\uD558\uB824\uBA74 http://localhost:8200\uC744 \uB123\uC5B4 \uC8FC\uC138\uC694.",
     default: DEFAULT_ZONE_ORIGIN,
     render: { ui: "ui-input", attributes: { placeholder: DEFAULT_ZONE_ORIGIN } },
     verifyRules: ["superboxZone"]
@@ -58,7 +58,7 @@ var OPTIONS = {
 };
 var VERIFY_RULES = {
   superboxZone: {
-    message: "https://\uD638\uC2A4\uD2B8 \uAF34\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4. http \uB294 localhost \uB9CC \uB429\uB2C8\uB2E4.",
+    message: "https://\uD638\uC2A4\uD2B8 \uD615\uC2DD\uC774\uC5B4\uC57C \uD574\uC694. http\uB294 localhost\uB9CC \uC4F8 \uC218 \uC788\uC5B4\uC694.",
     func: (value) => isAcceptableZone(value)
   }
 };

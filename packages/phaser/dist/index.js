@@ -36,6 +36,20 @@ function createProgressMixer() {
   };
 }
 
+// packages/phaser/src/safe-area.ts
+function usableFactor(factor) {
+  return Number.isFinite(factor) && factor > 0 ? factor : 1;
+}
+function toGameInsets(insets, canvas, scale, viewport) {
+  const covered = (inset, gap, factor) => Math.max(0, inset - gap) * usableFactor(factor);
+  return {
+    top: covered(insets.top, canvas.y, scale.y),
+    bottom: covered(insets.bottom, viewport.height - (canvas.y + canvas.height), scale.y),
+    left: covered(insets.left, canvas.x, scale.x),
+    right: covered(insets.right, viewport.width - (canvas.x + canvas.width), scale.x)
+  };
+}
+
 // packages/phaser/src/plugin.ts
 var SUPERBOX_PLAY_PLUGIN_KEY = "SuperboxPlay";
 var SUPERBOX_PLAY_MAPPING = "sbplay";
@@ -43,7 +57,7 @@ var SBPLAY_EVENTS = {
   /** 게임존이 일시정지시켰다 — data `{ reason }`. 루프 · 소리는 플러그인이 이미 멈췄다. */
   PAUSE: "sbplay.pause",
   RESUME: "sbplay.resume",
-  /** 안전 영역이 바뀌었다 — data `{ top, bottom, left, right }`. 화면이 돌았을 때도 온다. */
+  /** 안전 영역이나 캔버스 크기가 바뀌었다 — data 는 CSS 픽셀 `{ top, bottom, left, right }`. 씬 좌표는 `gameSafeArea` 로 읽는다. */
   SAFE_AREA: "sbplay.safearea",
   /** 플레이어가 바뀌었다 — data = 새 SessionInfo. */
   SESSION: "sbplay.session"
@@ -53,7 +67,7 @@ var RUNNING_STATUS = 5;
 var LOADING_STATUSES = /* @__PURE__ */ new Set([1, 2, 3, 4]);
 var FRAMES_BEFORE_COMPLETE = 2;
 function notConnected() {
-  return Object.assign(new Error("Play SDK \uAC00 \uC5C6\uC2B5\uB2C8\uB2E4"), { code: "NOT_CONNECTED" });
+  return Object.assign(new Error("Play SDK\uAC00 \uC5C6\uC5B4\uC694"), { code: "NOT_CONNECTED" });
 }
 function missingSdk() {
   const reject = () => Promise.reject(notConnected());
@@ -62,7 +76,7 @@ function missingSdk() {
   };
   return new Proxy({}, handler);
 }
-var _options, _started, _mixer, _scenes, _loaders, _failedLoad, _sawFirstScene, _framesSinceScene, _done, _pausedByPlatform, _soundsToResume, _resumeAllSounds, _SuperboxPlayPlugin_instances, playWindow_fn, initSession_fn, scanScenes_fn, watchScene_fn, watchLoader_fn, markSceneCreated_fn, checkFirstFrame_fn, anySceneLoading_fn, _onPause, _onResume, pauseSounds_fn, resumeSounds_fn, _onSafeArea, _onSessionChanged;
+var _options, _started, _mixer, _scenes, _loaders, _failedLoad, _sawFirstScene, _framesSinceScene, _done, _pausedByPlatform, _soundsToResume, _resumeAllSounds, _SuperboxPlayPlugin_instances, playWindow_fn, initSession_fn, scanScenes_fn, watchScene_fn, watchLoader_fn, markSceneCreated_fn, checkFirstFrame_fn, anySceneLoading_fn, _onPause, _onResume, pauseSounds_fn, resumeSounds_fn, _onSafeArea, _onCanvasResize, _onSessionChanged;
 var SuperboxPlayPlugin = class {
   constructor(pluginManager) {
     __privateAdd(this, _SuperboxPlayPlugin_instances);
@@ -103,6 +117,10 @@ var SuperboxPlayPlugin = class {
       this.safeArea = insets;
       this.game.events.emit(SBPLAY_EVENTS.SAFE_AREA, insets);
     });
+    /** 안전 영역 알림과 캔버스 크기 변화의 순서는 정해져 있지 않다 — 크기가 바뀐 뒤에도 알려 게임이 마지막 값으로 맞추게 한다. */
+    __privateAdd(this, _onCanvasResize, () => {
+      this.game.events.emit(SBPLAY_EVENTS.SAFE_AREA, this.safeArea);
+    });
     __privateAdd(this, _onSessionChanged, () => {
       const sdk = __privateMethod(this, _SuperboxPlayPlugin_instances, playWindow_fn).call(this).SBPlay;
       if (!sdk) return;
@@ -122,6 +140,7 @@ var SuperboxPlayPlugin = class {
   }
   /** 플러그인 관리자가 부른다. 다시 불려도 한 번만 건다. */
   start() {
+    var _a;
     if (__privateGet(this, _started)) return;
     __privateSet(this, _started, true);
     const { events } = this.game;
@@ -133,14 +152,17 @@ var SuperboxPlayPlugin = class {
     sdk.on("app.resume", __privateGet(this, _onResume));
     sdk.on("safeArea.change", __privateGet(this, _onSafeArea));
     sdk.on("session.changed", __privateGet(this, _onSessionChanged));
+    (_a = this.game.scale) == null ? void 0 : _a.on("resize", __privateGet(this, _onCanvasResize));
     if (__privateGet(this, _options).autoInit !== false) this.ready = __privateMethod(this, _SuperboxPlayPlugin_instances, initSession_fn).call(this, sdk);
   }
   stop() {
+    var _a;
     if (!__privateGet(this, _started)) return;
     __privateSet(this, _started, false);
     const { events } = this.game;
     events.off("prestep", __privateMethod(this, _SuperboxPlayPlugin_instances, scanScenes_fn), this);
     events.off("postrender", __privateMethod(this, _SuperboxPlayPlugin_instances, checkFirstFrame_fn), this);
+    (_a = this.game.scale) == null ? void 0 : _a.off("resize", __privateGet(this, _onCanvasResize));
     const sdk = __privateMethod(this, _SuperboxPlayPlugin_instances, playWindow_fn).call(this).SBPlay;
     sdk == null ? void 0 : sdk.off("app.pause", __privateGet(this, _onPause));
     sdk == null ? void 0 : sdk.off("app.resume", __privateGet(this, _onResume));
@@ -158,6 +180,18 @@ var SuperboxPlayPlugin = class {
     var _a;
     const win = __privateMethod(this, _SuperboxPlayPlugin_instances, playWindow_fn).call(this);
     return win.SBPlayLoading ?? ((_a = win.SBPlay) == null ? void 0 : _a.loading) ?? null;
+  }
+  /** `safeArea` 를 씬 좌표로 — 캔버스가 틀과 어긋난 만큼(FIT · ENVELOP)은 이미 뺐다. 스케일 관리자가 없으면 CSS 픽셀 그대로. */
+  get gameSafeArea() {
+    const { scale } = this.game;
+    if (!scale) return this.safeArea;
+    const { canvasBounds: canvas, displayScale } = scale;
+    const win = __privateMethod(this, _SuperboxPlayPlugin_instances, playWindow_fn).call(this);
+    const viewport = { width: win.innerWidth ?? canvas.x + canvas.width, height: win.innerHeight ?? canvas.y + canvas.height };
+    return toGameInsets(this.safeArea, canvas, displayScale, viewport);
+  }
+  get call() {
+    return (method, params) => this.sdk.call(method, params);
   }
   get ads() {
     return this.sdk.ads;
@@ -265,11 +299,11 @@ watchLoader_fn = function(loader) {
     if (__privateGet(this, _done)) return;
     const name = file.key ?? file.src ?? "unknown";
     if (__privateGet(this, _options).ignoreLoadErrors) {
-      console.warn("[superbox-play] \uD30C\uC77C\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4", name);
+      console.warn("[superbox-play] \uD30C\uC77C\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694", name);
       return;
     }
     __privateSet(this, _failedLoad, true);
-    (_a = this.loading) == null ? void 0 : _a.error(`\uD30C\uC77C\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: ${name}`);
+    (_a = this.loading) == null ? void 0 : _a.error(`\uD30C\uC77C\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694: ${name}`);
   });
 };
 markSceneCreated_fn = function() {
@@ -325,6 +359,7 @@ resumeSounds_fn = function() {
   __privateSet(this, _resumeAllSounds, false);
 };
 _onSafeArea = new WeakMap();
+_onCanvasResize = new WeakMap();
 _onSessionChanged = new WeakMap();
 function superboxPlayPlugin(data) {
   return { key: SUPERBOX_PLAY_PLUGIN_KEY, plugin: SuperboxPlayPlugin, start: true, mapping: SUPERBOX_PLAY_MAPPING, data: data ?? {} };

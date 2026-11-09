@@ -1,0 +1,24 @@
+{
+  "name": "com.superbox.play",
+  "version": "0.1.0",
+  "displayName": "Superbox Play SDK",
+  "description": "슈퍼박스 플레이 게임센터용 Unity SDK예요. 광고, 인앱 결제, 로그인, 포인트 미션, 안전 영역을 C#으로 호출해요. WebGL 빌드에서 동작하고 에디터에서는 시뮬레이션돼요.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Superbox"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SuperboxINC/superbox-play-sdk.git"
+  },
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "samples": [
+    {
+      "displayName": "Quick Start",
+      "description": "초기화, 보상형 광고, 결제, 미션을 호출하는 예제예요. 빈 GameObject에 붙이면 돼요.",
+      "path": "Samples~/QuickStart"
+    }
+  ]
+}

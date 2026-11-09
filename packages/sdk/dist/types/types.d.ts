@@ -45,18 +45,45 @@ export interface SessionInfo {
 export interface StoreProductInfo {
     readonly key: string;
     readonly title: string;
-    readonly type: 'consumable' | 'non_consumable';
+    readonly type: 'consumable' | 'non_consumable' | 'subscription';
     readonly price: {
         readonly amount: number;
         readonly currency: string;
         readonly label: string;
     };
+    /** 구독만 — 갱신 주기. price 는 주기마다 내는 돈 */
+    readonly renewalPeriod?: 'weekly' | 'monthly' | 'yearly';
+    /** 구독만 — 무료 체험('' 없음). 처음 구독하는 플레이어만 받는다 */
+    readonly freeTrial?: '' | '3d' | '1w' | '2w' | '1m';
+}
+/** `store.subscriptions` 의 줄 — 이 플레이어의 이 게임 구독. 이용권은 `accessible` 만 보고 연다(만료 시각은 서버가 따진다). */
+export interface SubscriptionInfo {
+    readonly productKey: string;
+    /** 그 구독의 첫 주문 */
+    readonly orderId: string;
+    /** canceled = 자동 갱신만 꺼짐(만료까지 이용) · revoked = 환불 · 취소로 바로 끝 */
+    readonly status: 'active' | 'canceled' | 'expired' | 'revoked';
+    readonly accessible: boolean;
+    /** 만료 시각(ISO 8601) */
+    readonly expiresDate: string;
+    readonly autoRenew: boolean;
+    readonly isTrial: boolean;
+    readonly renewalPeriod: string;
 }
 export interface PurchaseResult {
     readonly status: PurchaseStatus;
     readonly orderId: string;
     readonly productKey: string;
     readonly simulated: boolean;
+}
+/** `store.purchase` 의 두 번째 인자 — 결제가 끝나면(paid) grant 를 부르고, true 를 돌려주면 SDK 가 지급 확인(`store.completeOrder`)까지 부른다. */
+export interface PurchaseOptions {
+    /** 아이템을 지급하고 true. false 를 돌려주거나 던지면 지급 확인을 하지 않는다 — 그 주문은 다음 실행 때 `store.pendingOrders` 로 다시 온다. */
+    readonly grant: (order: PurchaseResult) => boolean | Promise<boolean>;
+}
+/** grant 를 넘긴 `store.purchase` 의 결과 — completed 는 지급 확인까지 끝났는지. */
+export interface GrantedPurchaseResult extends PurchaseResult {
+    readonly completed: boolean;
 }
 export interface PendingOrder {
     readonly orderId: string;
@@ -124,6 +151,12 @@ export interface GameChannelMethods {
         };
         result: {
             completed: boolean;
+        };
+    };
+    'store.subscriptions': {
+        params: Record<string, never>;
+        result: {
+            subscriptions: readonly SubscriptionInfo[];
         };
     };
     'auth.login': {
@@ -290,8 +323,12 @@ export interface SBPlay {
     readonly store: {
         products(): Promise<GameChannelMethods['store.products']['result']>;
         purchase(productKey: string): Promise<PurchaseResult>;
+        /** 결제 → 지급(grant) → 지급 확인을 한 번에. 채널 메시지는 같다(store.purchase · store.completeOrder). */
+        purchase(productKey: string, options: PurchaseOptions): Promise<GrantedPurchaseResult>;
         pendingOrders(): Promise<GameChannelMethods['store.pendingOrders']['result']>;
         completeOrder(orderId: string): Promise<GameChannelMethods['store.completeOrder']['result']>;
+        /** 이 플레이어의 구독 — 이용권은 `accessible` 만 보고 연다. 게임존 밖에서는 빈 목록. */
+        subscriptions(): Promise<GameChannelMethods['store.subscriptions']['result']>;
     };
     readonly auth: {
         login(): Promise<GameChannelMethods['auth.login']['result']>;

@@ -36,6 +36,19 @@ export interface SoundManagerLike {
     pauseAll?(): unknown;
     resumeAll?(): unknown;
 }
+/** 3.60 · 4 의 ScaleManager — `resize` 는 canvasBounds · displayScale 을 고친 뒤에 온다(src/scale/ScaleManager.js refresh). */
+export interface ScaleManagerLike extends Pick<EventsLike, 'on' | 'off'> {
+    readonly canvasBounds: {
+        readonly x: number;
+        readonly y: number;
+        readonly width: number;
+        readonly height: number;
+    };
+    readonly displayScale: {
+        readonly x: number;
+        readonly y: number;
+    };
+}
 export interface PhaserGameLike {
     readonly events: EventsLike;
     readonly isPaused: boolean;
@@ -45,6 +58,7 @@ export interface PhaserGameLike {
         readonly scenes: readonly PhaserSceneLike[];
     };
     readonly sound?: SoundManagerLike;
+    readonly scale?: ScaleManagerLike;
 }
 export interface PluginManagerLike {
     readonly game: PhaserGameLike;

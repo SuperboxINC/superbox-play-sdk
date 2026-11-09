@@ -20,7 +20,11 @@ npx superbox-play --help
 | Phaser 3.60+ · 4 플러그인 | `import { superboxPlayPlugin } from 'superbox-play-sdk/phaser'` |
 | Cocos Creator 3.8+ 확장 | `engines/cocos-creator/superbox-play` 폴더를 프로젝트의 `extensions/superbox-play` 로 복사합니다. 빌드는 필요 없습니다. |
 
-Unity 는 WebGL 빌드 폴더를 `superbox-play build` 로 묶습니다. C# API 는 Unity 패키지 `com.superbox.html5` 에 있습니다.
+Unity 는 아래 C# SDK 를 넣으면 상단 메뉴 `Superbox Play > Build & Package` 로 WebGL 빌드부터 패키지까지 만듭니다. C# SDK 는 Package Manager 의 Add package from git URL 에 아래 주소를 넣어 받습니다.
+
+```text
+https://github.com/SuperboxINC/superbox-play-sdk.git?path=engines/unity/superbox-play
+```
 
 ## 패키지 만들고 올리기
 

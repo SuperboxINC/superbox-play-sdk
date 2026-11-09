@@ -33,6 +33,8 @@ const DESIGN_HEIGHT = 1280;
 const BUTTON_WIDTH = 620;
 const BUTTON_HEIGHT = 104;
 const BACKGROUND = new Color(15, 26, 28, 255);
+const STATUS_Y = 360;
+const WALLET_Y = 300;
 
 interface SampleState {
   gems: number;
@@ -52,6 +54,7 @@ const state: SampleState = { gems: 0, rewards: 0, missions: 0, paused: false, re
 export class SampleGame extends Component {
   private wallet: Label | null = null;
   private status: Label | null = null;
+  private stopWatchingSafeArea: (() => void) | null = null;
 
   onLoad(): void {
     // 프로젝트 설정은 너비 맞춤이다 — 세로형 UI 가 가로로 넓은 창(데스크톱)에서 위아래로 잘리지 않게 높이에 맞춘다
@@ -60,15 +63,24 @@ export class SampleGame extends Component {
     const size = view.getVisibleSize();
     const camera = this.createCamera(size.height);
     const canvas = this.createCanvas(camera);
-    this.status = this.addLabel(canvas, '게임존과 연결하는 중…', new Vec3(0, 360, 0), 26);
-    this.wallet = this.addLabel(canvas, '', new Vec3(0, 300, 0), 34);
+    this.status = this.addLabel(canvas, '게임존과 연결하는 중…', new Vec3(0, STATUS_Y, 0), 26);
+    this.wallet = this.addLabel(canvas, '', new Vec3(0, WALLET_Y, 0), 34);
     this.addButton(canvas, '보상형 광고', new Vec3(0, 120, 0), new Color(20, 184, 166, 255), () => this.showRewarded());
     this.addButton(canvas, '젬 300 구매', new Vec3(0, -10, 0), new Color(38, 58, 60, 255), () => this.purchase());
     this.addButton(canvas, '한 판 끝(미션)', new Vec3(0, -140, 0), new Color(38, 58, 60, 255), () => this.finishStage());
     this.renderWallet();
   }
 
+  onDestroy(): void {
+    this.stopWatchingSafeArea?.();
+  }
+
   start(): void {
+    // 안전 영역 — top 에는 오른쪽 위 메뉴 버튼 자리가 들어 있다. 위쪽 글자를 그만큼 내린다
+    this.stopWatchingSafeArea = SuperboxPlay.watchSafeArea(({ top }) => {
+      this.status?.node.setPosition(0, STATUS_Y - top);
+      this.wallet?.node.setPosition(0, WALLET_Y - top);
+    });
     SuperboxPlay.on('app.pause', () => {
       state.paused = true;
     });
@@ -165,12 +177,15 @@ export class SampleGame extends Component {
     this.renderWallet();
   }
 
+  // 결제가 끝나면(paid) grant 로 지급하고, true 를 돌려주면 SDK 가 지급 확인(completeOrder)까지 부른다
   private async purchase(): Promise<void> {
-    const order = await SuperboxPlay.store.purchase('gem_300');
-    if (order.status !== 'paid') return;
-    state.gems += 300;
-    this.renderWallet();
-    await SuperboxPlay.store.completeOrder(order.orderId);
+    await SuperboxPlay.store.purchase('gem_300', {
+      grant: () => {
+        state.gems += 300;
+        this.renderWallet();
+        return true;
+      },
+    });
   }
 
   private async finishStage(): Promise<void> {

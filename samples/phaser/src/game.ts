@@ -75,21 +75,33 @@ class MainScene extends Phaser.Scene {
     ];
     buttons.forEach((button, index) => this.addButton(button, 620 + index * 130));
 
-    this.game.events.on(SBPLAY_EVENTS.PAUSE, () => {
+    this.listen(SBPLAY_EVENTS.PAUSE, () => {
       state.paused = true;
     });
-    this.game.events.on(SBPLAY_EVENTS.RESUME, () => {
+    this.listen(SBPLAY_EVENTS.RESUME, () => {
       state.paused = false;
       state.resumed += 1;
     });
-    this.game.events.on(SBPLAY_EVENTS.SAFE_AREA, (insets: { bottom: number }) => {
-      state.safeAreaBottom = insets.bottom;
-    });
+    this.listen(SBPLAY_EVENTS.SAFE_AREA, () => this.applySafeArea());
 
     void this.sbplay.ready.then((session) => {
+      if (!this.scene.isActive()) return;
       state.environment = session?.environment ?? 'none';
       this.status.setText(session ? `환경: ${session.environment}` : '게임존 밖이에요');
+      this.applySafeArea();
     });
+  }
+
+  // game.events 는 씬보다 오래 산다 — 씬이 끝날 때 같이 뗀다
+  private listen(event: string, handler: () => void): void {
+    this.game.events.on(event, handler);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(event, handler));
+  }
+
+  // 안전 영역 — top 에는 오른쪽 위 메뉴 버튼 자리가 들어 있다. 화면 전체를 그만큼 내린다
+  private applySafeArea(): void {
+    state.safeAreaBottom = this.sbplay.safeArea.bottom;
+    this.cameras.main.setScroll(0, -this.sbplay.gameSafeArea.top);
   }
 
   private addButton(button: ButtonSpec, y: number): void {
@@ -112,12 +124,15 @@ class MainScene extends Phaser.Scene {
     this.renderWallet();
   }
 
+  // 결제가 끝나면(paid) grant 로 지급하고, true 를 돌려주면 SDK 가 지급 확인(completeOrder)까지 부른다
   private async purchase(): Promise<void> {
-    const order = await this.sbplay.store.purchase('gem_300');
-    if (order.status !== 'paid') return;
-    state.gems += 300;
-    this.renderWallet();
-    await this.sbplay.store.completeOrder(order.orderId);
+    await this.sbplay.store.purchase('gem_300', {
+      grant: () => {
+        state.gems += 300;
+        this.renderWallet();
+        return true;
+      },
+    });
   }
 
   private async finishStage(): Promise<void> {

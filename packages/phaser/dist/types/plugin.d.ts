@@ -14,7 +14,7 @@ export declare const SBPLAY_EVENTS: {
     /** 게임존이 일시정지시켰다 — data `{ reason }`. 루프 · 소리는 플러그인이 이미 멈췄다. */
     readonly PAUSE: "sbplay.pause";
     readonly RESUME: "sbplay.resume";
-    /** 안전 영역이 바뀌었다 — data `{ top, bottom, left, right }`. 화면이 돌았을 때도 온다. */
+    /** 안전 영역이나 캔버스 크기가 바뀌었다 — data 는 CSS 픽셀 `{ top, bottom, left, right }`. 씬 좌표는 `gameSafeArea` 로 읽는다. */
     readonly SAFE_AREA: "sbplay.safearea";
     /** 플레이어가 바뀌었다 — data = 새 SessionInfo. */
     readonly SESSION: "sbplay.session";
@@ -45,6 +45,9 @@ export declare class SuperboxPlayPlugin {
     /** 전역 SBPlay — 없으면 부를 때 NOT_CONNECTED 로 거절하는 대체. */
     get sdk(): SBPlay;
     get loading(): SBPlayLoading | null;
+    /** `safeArea` 를 씬 좌표로 — 캔버스가 틀과 어긋난 만큼(FIT · ENVELOP)은 이미 뺐다. 스케일 관리자가 없으면 CSS 픽셀 그대로. */
+    get gameSafeArea(): SafeArea;
+    get call(): SBPlay['call'];
     get ads(): SBPlay['ads'];
     get store(): SBPlay['store'];
     get auth(): SBPlay['auth'];

@@ -18,10 +18,10 @@ function assertZoneOrigin(origin) {
   try {
     url = new URL(origin);
   } catch {
-    throw new SdkLoadError(`\uC798\uBABB\uB41C \uAC8C\uC784\uC874 \uCD9C\uCC98: ${origin}`);
+    throw new SdkLoadError(`\uC798\uBABB\uB41C \uAC8C\uC784\uC874 \uC8FC\uC18C: ${origin}`);
   }
   const allowed = url.protocol === "https:" || url.protocol === "http:" && LOCAL_HTTP_HOST.test(url.hostname);
-  if (!allowed || url.origin !== origin) throw new SdkLoadError(`\uC798\uBABB\uB41C \uAC8C\uC784\uC874 \uCD9C\uCC98: ${origin}`);
+  if (!allowed || url.origin !== origin) throw new SdkLoadError(`\uC798\uBABB\uB41C \uAC8C\uC784\uC874 \uC8FC\uC18C: ${origin}`);
 }
 var loading = null;
 function loadSBPlay(options = {}) {
@@ -38,9 +38,9 @@ function loadSBPlay(options = {}) {
     script.src = `${zoneOrigin}${SDK_PATH}`;
     script.onload = () => {
       if (window.SBPlay) resolve(window.SBPlay);
-      else reject(new SdkLoadError("Play SDK \uB97C \uBD88\uB7EC\uC654\uC9C0\uB9CC \uC804\uC5ED SBPlay \uAC00 \uC5C6\uC2B5\uB2C8\uB2E4"));
+      else reject(new SdkLoadError("Play SDK\uB97C \uBD88\uB7EC\uC654\uC9C0\uB9CC \uC804\uC5ED SBPlay\uAC00 \uC5C6\uC5B4\uC694"));
     };
-    script.onerror = () => reject(new SdkLoadError(`Play SDK \uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: ${script.src}`));
+    script.onerror = () => reject(new SdkLoadError(`Play SDK\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694: ${script.src}`));
     document.head.appendChild(script);
   }).finally(() => {
     loading = null;
@@ -62,6 +62,7 @@ var GAME_CHANNEL_METHODS = [
   "store.purchase",
   "store.pendingOrders",
   "store.completeOrder",
+  "store.subscriptions",
   "auth.login",
   "auth.serverAuthCode",
   "social.share",
@@ -108,6 +109,7 @@ var SBPLAY_WRAPPERS = [
   "store.purchase",
   "store.pendingOrders",
   "store.completeOrder",
+  "store.subscriptions",
   "auth.login",
   "auth.serverAuthCode",
   "social.share",

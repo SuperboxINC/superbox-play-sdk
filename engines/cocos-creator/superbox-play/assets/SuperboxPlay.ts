@@ -1,4 +1,4 @@
-import { AudioSource, director, Director, game } from 'cc';
+import { AudioSource, director, Director, game, screen, view } from 'cc';
 import { EDITOR } from 'cc/env';
 
 /**
@@ -17,17 +17,48 @@ export interface SuperboxSafeArea {
   readonly right: number;
 }
 
+export interface SuperboxFeatures {
+  readonly ads: { readonly rewarded: boolean; readonly interstitial: boolean; readonly banner: boolean };
+  readonly purchases: boolean;
+  readonly share: boolean;
+  readonly haptic: boolean;
+  readonly externalLinks: boolean;
+  readonly leaderboard: boolean;
+  readonly analytics: boolean;
+  readonly missions: boolean;
+  readonly points: boolean;
+}
+
 export interface SuperboxSession {
+  readonly protocol: 1;
   readonly environment: 'live' | 'sandbox' | 'standalone';
   readonly player: { readonly key: string; readonly displayName: string; readonly linked: boolean };
-  readonly features: {
-    readonly ads: { readonly rewarded: boolean; readonly interstitial: boolean; readonly banner: boolean };
-    readonly purchases: boolean;
-    readonly missions: boolean;
-    readonly points: boolean;
-  };
+  readonly features: SuperboxFeatures;
   readonly safeArea: SuperboxSafeArea;
   readonly locale: string;
+}
+
+export interface SuperboxProduct {
+  readonly key: string;
+  readonly title: string;
+  readonly type: 'consumable' | 'non_consumable' | 'subscription';
+  readonly price: { readonly amount: number; readonly currency: string; readonly label: string };
+  /** 구독만 — 갱신 주기 */
+  readonly renewalPeriod?: 'weekly' | 'monthly' | 'yearly';
+  /** 구독만 — 무료 체험('' 없음) */
+  readonly freeTrial?: '' | '3d' | '1w' | '2w' | '1m';
+}
+
+/** 이 플레이어의 이 게임 구독 — 이용권은 `accessible` 만 보고 연다. */
+export interface SuperboxSubscription {
+  readonly productKey: string;
+  readonly orderId: string;
+  readonly status: 'active' | 'canceled' | 'expired' | 'revoked';
+  readonly accessible: boolean;
+  readonly expiresDate: string;
+  readonly autoRenew: boolean;
+  readonly isTrial: boolean;
+  readonly renewalPeriod: string;
 }
 
 export interface SuperboxPurchase {
@@ -35,6 +66,31 @@ export interface SuperboxPurchase {
   readonly orderId: string;
   readonly productKey: string;
   readonly simulated: boolean;
+}
+
+/** `store.purchase` 의 두 번째 인자 — 아이템을 지급하고 true 를 돌려주면 지급 확인(completeOrder)까지 부른다. false · 오류면 다음 실행 때 pendingOrders 로 다시 온다. */
+export interface SuperboxPurchaseOptions {
+  readonly grant: (order: SuperboxPurchase) => boolean | Promise<boolean>;
+}
+
+export interface SuperboxGrantedPurchase extends SuperboxPurchase {
+  /** 지급 확인까지 끝났다 */
+  readonly completed: boolean;
+}
+
+export interface SuperboxPendingOrder {
+  readonly orderId: string;
+  readonly productKey: string;
+  readonly status: SuperboxPurchase['status'];
+  readonly simulated?: boolean;
+}
+
+/** `on` · `off` 로 받는 이벤트와 값. */
+export interface SuperboxEvents {
+  'app.pause': { readonly reason?: 'background' | 'ad' | 'payment' | 'menu' };
+  'app.resume': Record<string, never>;
+  'safeArea.change': SuperboxSafeArea;
+  'session.changed': Record<string, never>;
 }
 
 type Listener = (data: Record<string, unknown>) => void;
@@ -53,11 +109,14 @@ interface PlaySdk {
   call(method: string, params?: Record<string, unknown>): Promise<unknown>;
   on(event: string, listener: Listener): void;
   off(event: string, listener: Listener): void;
+  readonly store: { purchase(productKey: string, options: SuperboxPurchaseOptions): Promise<unknown> };
 }
 
 interface PlayGlobal {
   readonly SBPlay?: PlaySdk;
   readonly SBPlayLoading?: LoadingApi;
+  readonly innerWidth: number;
+  readonly innerHeight: number;
 }
 
 /** 조각이 불린 시점 — 엔진과 프로젝트 스크립트까지 받은 뒤다. */
@@ -75,10 +134,24 @@ function loading(): LoadingApi | null {
   return playGlobal.SBPlayLoading ?? playGlobal.SBPlay?.loading ?? null;
 }
 
+function notConnected(): Promise<never> {
+  return Promise.reject(Object.assign(new Error('Play SDK가 없어요'), { code: 'NOT_CONNECTED' }));
+}
+
 function call<T>(method: string, params?: Record<string, unknown>): Promise<T> {
   const target = sdk();
-  if (!target) return Promise.reject(Object.assign(new Error('Play SDK 가 없습니다'), { code: 'NOT_CONNECTED' }));
+  if (!target) return notConnected();
   return target.call(method, params) as Promise<T>;
+}
+
+/** grant 를 넘기면 결제 → 지급 → 지급 확인을 전역 SBPlay 가 잇는다(결과에 completed). 없으면 결제 결과 그대로 */
+function purchase(productKey: string): Promise<SuperboxPurchase>;
+function purchase(productKey: string, options: SuperboxPurchaseOptions): Promise<SuperboxGrantedPurchase>;
+function purchase(productKey: string, options?: SuperboxPurchaseOptions): Promise<SuperboxPurchase> {
+  if (!options) return call<SuperboxPurchase>('store.purchase', { productKey });
+  const target = sdk();
+  if (!target) return notConnected();
+  return target.store.purchase(productKey, options) as Promise<SuperboxGrantedPurchase>;
 }
 
 function withGroup(params: Record<string, unknown>, adGroupId?: string): Record<string, unknown> {
@@ -94,6 +167,47 @@ function reportOverall(value: number): void {
   loading()?.progress(lastProgress);
 }
 
+const ZERO_INSETS: SuperboxSafeArea = { top: 0, bottom: 0, left: 0, right: 0 };
+let currentSafeArea = ZERO_INSETS;
+const safeAreaWatchers = new Set<() => void>();
+
+/** 네 변이 다 숫자일 때만 받는다 — 일부만 온 값이 나머지 변을 0 으로 만들면 안 된다. */
+function readInsets(value: unknown): SuperboxSafeArea | null {
+  const { top, bottom, left, right } = (value ?? {}) as Partial<Record<keyof SuperboxSafeArea, unknown>>;
+  return typeof top === 'number' && typeof bottom === 'number' && typeof left === 'number' && typeof right === 'number' ? { top, bottom, left, right } : null;
+}
+
+function updateSafeArea(value: unknown): void {
+  const insets = readInsets(value);
+  if (!insets) return;
+  currentSafeArea = insets;
+  for (const notify of [...safeAreaWatchers]) notify();
+}
+
+/**
+ * CSS 픽셀 한 변 → 디자인 좌표. 엔진의 view 스케일 · 뷰포트는 물리 픽셀이다(screen.windowSize = CSS × devicePixelRatio, 엔진이 2 로 자른다).
+ * 캔버스 바깥 여백만큼은 게임을 가리지 않고, 뒤의 식은 엔진의 view._convertToUISpace 와 같다 — 레터박스(양수 뷰포트)는 그만큼 덜 가리고,
+ * 잘라 채우는 정책(NO_BORDER, 음수 뷰포트)은 visibleRect 가 잘린 부분까지 포함해 Widget 이 화면 밖에 붙으므로 잘린 만큼 더 들어와야 한다.
+ */
+function sideInDesign(inset: number, canvasGap: number, viewportOffset: number, scale: number): number {
+  return Math.max(0, Math.max(0, inset - canvasGap) * screen.devicePixelRatio - viewportOffset) / scale;
+}
+
+function toDesignInsets(insets: SuperboxSafeArea): SuperboxSafeArea {
+  const canvas = game.canvas;
+  const scaleX = view.getScaleX();
+  const scaleY = view.getScaleY();
+  if (!canvas || !(scaleX > 0) || !(scaleY > 0)) return ZERO_INSETS;
+  const box = canvas.getBoundingClientRect();
+  const viewport = view.getViewportRect();
+  return {
+    top: sideInDesign(insets.top, box.top, viewport.y, scaleY),
+    bottom: sideInDesign(insets.bottom, playGlobal.innerHeight - box.bottom, viewport.y, scaleY),
+    left: sideInDesign(insets.left, box.left, viewport.x, scaleX),
+    right: sideInDesign(insets.right, playGlobal.innerWidth - box.right, viewport.x, scaleX),
+  };
+}
+
 export const SuperboxPlay = {
   get session(): SuperboxSession | null {
     return sdk()?.session ?? null;
@@ -101,16 +215,41 @@ export const SuperboxPlay = {
   get loading(): LoadingApi | null {
     return loading();
   },
+  /** 지금 안전 영역 — 게임 틀 기준 CSS 픽셀. `init` 전에는 0. */
+  get safeArea(): SuperboxSafeArea {
+    return currentSafeArea;
+  },
+  /** 지금 안전 영역을 디자인 좌표로 — Widget 여백 · 노드 좌표에 바로 쓴다. */
+  get designSafeArea(): SuperboxSafeArea {
+    return toDesignInsets(currentSafeArea);
+  },
 
   /** 게임존과 연결하고 세션을 받는다. SDK 가 없으면 null. */
   init(): Promise<SuperboxSession | null> {
-    return sdk()?.init() ?? Promise.resolve(null);
+    const target = sdk();
+    if (!target) return Promise.resolve(null);
+    return target.init().then((session) => {
+      updateSafeArea(session.safeArea);
+      return session;
+    });
   },
-  on(event: string, listener: Listener): void {
-    sdk()?.on(event, listener);
+  on<E extends keyof SuperboxEvents>(event: E, listener: (data: SuperboxEvents[E]) => void): void {
+    sdk()?.on(event, listener as unknown as Listener);
   },
-  off(event: string, listener: Listener): void {
-    sdk()?.off(event, listener);
+  off<E extends keyof SuperboxEvents>(event: E, listener: (data: SuperboxEvents[E]) => void): void {
+    sdk()?.off(event, listener as unknown as Listener);
+  },
+  /** 안전 영역이나 화면 크기가 바뀔 때마다 디자인 좌표로 알린다. 등록하면 지금 값으로 한 번 바로 부른다. 돌려준 함수를 부르면 그만둔다. */
+  watchSafeArea(listener: (insets: SuperboxSafeArea) => void): () => void {
+    const notify = (): void => listener(toDesignInsets(currentSafeArea));
+    safeAreaWatchers.add(notify);
+    // 창 크기가 바뀌어도, 게임이 설계 해상도를 바꿔도 이 이벤트를 지난다
+    view.on('design-resolution-changed', notify);
+    notify();
+    return () => {
+      safeAreaWatchers.delete(notify);
+      view.off('design-resolution-changed', notify);
+    };
   },
   call,
 
@@ -123,16 +262,19 @@ export const SuperboxPlay = {
     banner: (action: 'show' | 'hide' | 'destroy', adGroupId?: string) => call<{ visible: boolean; heightPx: number }>('ads.banner', withGroup({ action }, adGroupId)),
   },
   store: {
-    products: () => call<{ products: readonly unknown[] }>('store.products'),
-    purchase: (productKey: string) => call<SuperboxPurchase>('store.purchase', { productKey }),
-    pendingOrders: () => call<{ orders: readonly SuperboxPurchase[] }>('store.pendingOrders'),
+    products: () => call<{ products: readonly SuperboxProduct[] }>('store.products'),
+    purchase,
+    pendingOrders: () => call<{ orders: readonly SuperboxPendingOrder[] }>('store.pendingOrders'),
     completeOrder: (orderId: string) => call<{ completed: boolean }>('store.completeOrder', { orderId }),
+    subscriptions: () => call<{ subscriptions: readonly SuperboxSubscription[] }>('store.subscriptions'),
   },
   auth: {
     login: () => call<{ loggedIn: boolean; key: string; displayName: string; linked: boolean }>('auth.login'),
+    serverAuthCode: () => call<{ provider: 'superbox-play'; code: string; expiresInSeconds: number }>('auth.serverAuthCode'),
   },
   social: {
     share: (text: string, url?: string) => call<{ shared: boolean }>('social.share', url ? { text, url } : { text }),
+    shareLink: (path: string) => call<{ url: string }>('social.shareLink', { path }),
     openUrl: (url: string) => call<Record<string, never>>('social.openUrl', { url }),
   },
   analytics: {
@@ -214,4 +356,5 @@ if (!EDITOR) {
   hookFirstScene();
   sdk()?.on('app.pause', onPlatformPause);
   sdk()?.on('app.resume', onPlatformResume);
+  sdk()?.on('safeArea.change', updateSafeArea);
 }

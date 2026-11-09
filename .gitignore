@@ -1,6 +1,10 @@
 node_modules/
 *.sbp
 
+# UPM 규격상 ~ 로 끝나는 폴더는 Unity 가 임포트하지 않는다 — 전역 *~ 패턴이 이 폴더를 잡지 않게
+!engines/unity/superbox-play/Samples~/
+!engines/unity/superbox-play/Editor/Packager~/
+
 # 샘플을 돌리면 생기는 것
 samples/*/dist/
 samples/*/package-lock.json

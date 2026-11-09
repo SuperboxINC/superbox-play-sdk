@@ -1,5 +1,10 @@
 node_modules/
 *.sbp
+*.tsbuildinfo
+
+# npm run build:all 의 중간 산출물 — 저장소에는 받아서 바로 쓰는 결과물만 둔다
+packages/package-core/dist/
+packages/package-core/src/runtime-assets.generated.ts
 
 # UPM 규격상 ~ 로 끝나는 폴더는 Unity 가 임포트하지 않는다 — 전역 *~ 패턴이 이 폴더를 잡지 않게
 !engines/unity/superbox-play/Samples~/

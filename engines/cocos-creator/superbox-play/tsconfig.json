@@ -1,0 +1,17 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "noUnusedLocals": false,
+    "paths": {
+      "db://superbox-play/SuperboxPlay": ["./assets/SuperboxPlay.ts"]
+    }
+  },
+  "include": [
+    "source/**/*.ts",
+    "assets/**/*.ts",
+    "../../../samples/cocos/assets/scripts/**/*.ts",
+    "../../../node_modules/@cocos/creator-types/engine.d.ts"
+  ]
+}

@@ -269,7 +269,7 @@ export interface GameChannelEvents {
     'session.changed': Record<string, never>;
 }
 export type GameChannelEvent = keyof GameChannelEvents;
-/** 오류 코드 — README.md 표. reject 하는 값의 `code`. */
+/** 오류 코드 — reject 하는 값의 `code`. */
 export type PlayErrorCode = 'UNSUPPORTED' | 'INVALID_PARAMS' | 'FORBIDDEN' | 'CANCELED' | 'TIMEOUT' | 'RATE_LIMITED' | 'AD_NO_FILL' | 'AD_FREQUENCY_CAPPED' | 'PAY_PENDING' | 'PAY_FAILED' | 'NOT_CONNECTED' | 'NETWORK' | 'INTERNAL';
 export interface PlayFailure extends Error {
     readonly code: PlayErrorCode;

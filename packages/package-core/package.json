@@ -1,0 +1,20 @@
+{
+  "name": "@superbox-play/package",
+  "version": "0.1.1",
+  "description": "슈퍼박스 플레이 게임 패키지 .sbp — manifest 검증 · 입구 주입 · ZIP 쓰기/읽기",
+  "type": "module",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "main": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/types/browser.d.ts",
+      "default": "./dist/browser.js"
+    }
+  },
+  "files": ["dist"]
+}

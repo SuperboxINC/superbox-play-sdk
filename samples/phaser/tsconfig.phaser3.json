@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@superbox-play/sdk": ["../../packages/sdk/src/index.ts"],
+      "superbox-play-sdk/phaser": ["../../packages/phaser/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "../../node_modules/phaser3/types/phaser.d.ts"]
+}

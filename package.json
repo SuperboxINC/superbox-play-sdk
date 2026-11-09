@@ -1,10 +1,10 @@
 {
   "name": "superbox-play-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "슈퍼박스 플레이 게임 도구 — 패키지 CLI · Play SDK 타입 · Phaser 플러그인 · Cocos Creator 확장",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": "github:SuperboxINC/superbox-play-sdk",
   "engines": {
     "node": ">=24 <25"
@@ -28,14 +28,18 @@
   },
   "typesVersions": {
     "*": {
-      "phaser": ["packages/phaser/dist/types/index.d.ts"]
+      "phaser": [
+        "packages/phaser/dist/types/index.d.ts"
+      ]
     }
   },
   "files": [
     "packages/cli/dist",
     "packages/sdk/dist",
     "packages/phaser/dist",
-    "engines/cocos-creator/superbox-play"
+    "engines/cocos-creator/superbox-play/dist",
+    "engines/cocos-creator/superbox-play/assets",
+    "engines/cocos-creator/superbox-play/package.json"
   ],
   "peerDependencies": {
     "phaser": ">=3.60.0 <5"
@@ -44,5 +48,20 @@
     "phaser": {
       "optional": true
     }
+  },
+  "scripts": {
+    "build:all": "node scripts/build.mjs",
+    "unity:meta": "node scripts/unity-meta.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p engines/cocos-creator/superbox-play/tsconfig.json && tsc --noEmit -p samples/phaser/tsconfig.phaser3.json && tsc --noEmit -p samples/phaser/tsconfig.phaser4.json",
+    "pretest": "node scripts/build.mjs --no-types",
+    "test": "node --test \"packages/*/src/**/*.test.ts\" \"engines/cocos-creator/superbox-play/source/**/*.test.ts\" \"engines/unity/packager/**/*.test.ts\" \"scripts/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@cocos/creator-types": "3.8.8",
+    "@types/node": "24.19.2",
+    "esbuild": "0.28.2",
+    "phaser3": "npm:phaser@3.90.0",
+    "phaser4": "npm:phaser@4.2.1",
+    "typescript": "6.0.3"
   }
 }

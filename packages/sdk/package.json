@@ -1,0 +1,16 @@
+{
+  "name": "@superbox-play/sdk",
+  "version": "0.1.1",
+  "description": "슈퍼박스 플레이 Play SDK 타입과 얇은 진입 — 전역 SBPlay · SBPlayLoading",
+  "type": "module",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "main": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"]
+}

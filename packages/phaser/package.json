@@ -1,0 +1,28 @@
+{
+  "name": "@superbox-play/phaser",
+  "version": "0.1.1",
+  "description": "슈퍼박스 플레이 Phaser 플러그인 — 로더 진행률 · 첫 씬 · 일시정지 · 안전 영역을 잇는다 (Phaser 3.60+ · 4)",
+  "type": "module",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "main": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./global": "./dist/superbox-play-phaser.js"
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@superbox-play/sdk": "0.1.1"
+  },
+  "peerDependencies": {
+    "phaser": ">=3.60.0 <5"
+  },
+  "peerDependenciesMeta": {
+    "phaser": {
+      "optional": true
+    }
+  }
+}

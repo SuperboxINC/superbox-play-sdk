@@ -1,0 +1,142 @@
+/* 기본 로딩 화면 — 어두운 바탕 위에 아이콘 · 이름 · 얇은 막대. 게임 CSS 와 섞이지 않게 모두 #sbp-loading 아래에 둔다. */
+#sbp-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(72vmax 46vmax at 50% 38%, var(--sbp-glow), transparent 70%), var(--sbp-bg);
+  color: #f2f4f6;
+  font: 400 13px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
+  text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#sbp-loading * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+#sbp-loading .sbp-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: -5vh;
+  animation: sbp-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+#sbp-loading .sbp-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: linear-gradient(150deg, var(--sbp-primary), var(--sbp-bg) 150%);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+/* 이름도 그림도 없으면 빈 상자를 그리지 않는다 — 게임존이 알려 주면 그때 나타난다 */
+#sbp-loading .sbp-icon[hidden] {
+  display: none;
+}
+
+#sbp-loading .sbp-icon img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#sbp-loading .sbp-name {
+  min-height: 26px;
+  max-width: 76vw;
+  margin-top: 18px;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 26px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sbp-loading .sbp-bar {
+  position: relative;
+  width: min(200px, 52vw);
+  height: 3px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+#sbp-loading .sbp-bar i {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--sbp-primary);
+  box-shadow: 0 0 12px var(--sbp-primary);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.2s linear;
+}
+
+/* 첫 진행률이 오기 전 — 멈춘 것처럼 보이지 않게 작은 조각이 지나간다 */
+#sbp-loading .sbp-bar:not([data-on]) i {
+  width: 34%;
+  transform: translateX(-100%);
+  animation: sbp-idle 1.5s ease-in-out infinite;
+}
+
+#sbp-loading .sbp-tip {
+  position: absolute;
+  right: 24px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 44px);
+  left: 24px;
+  color: rgba(255, 255, 255, 0.6);
+  word-break: keep-all;
+  transition: opacity 0.2s;
+}
+
+@keyframes sbp-idle {
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@keyframes sbp-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #sbp-loading,
+  #sbp-loading * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  #sbp-loading .sbp-bar:not([data-on]) i {
+    width: 100%;
+    opacity: 0.35;
+    transform: none;
+  }
+}

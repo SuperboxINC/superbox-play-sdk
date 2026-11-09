@@ -62,4 +62,4 @@ npm test
 
 ## 라이선스
 
-저작권은 SUPERBOX INC에 있어요. 슈퍼박스 플레이용 게임을 만들 때 쓸 수 있고, 자세한 조건은 [LICENSE](LICENSE)에서 확인해 주세요.
+저작권은 SUPERBOX Inc에 있어요. 슈퍼박스 플레이용 게임을 만들 때 쓸 수 있고, 자세한 조건은 [LICENSE](LICENSE)에서 확인해 주세요.

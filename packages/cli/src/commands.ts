@@ -1,13 +1,15 @@
 import { stat, writeFile } from 'node:fs/promises';
+import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENGINE_NAMES, PackageError, type EngineName, type PackageManifest } from '../../package-core/src/browser.ts';
-import { CONFIG_FILE, createPackage, initialConfig, verifyPackageFile, type PackageReport, type SuperboxConfig } from '../../package-core/src/index.ts';
+import { checkSdkPolicy, CONFIG_FILE, createPackage, initialConfig, verifyPackageFile, type PackageReport, type SuperboxConfig } from '../../package-core/src/index.ts';
 import type { CliIO } from './cli.ts';
 import { isFile, resolveConfig } from './config-file.ts';
 import { API_KEY_ENV, API_KEY_FLAG, assertConsoleOrigin, DEFAULT_CONSOLE_ORIGIN, deployPackage, resolveApiKey } from './deploy.ts';
 import { startDevServer, DEFAULT_DEV_PORT } from './dev-server.ts';
 import { CliError } from './errors.ts';
+import { formatLanAccess, lanAddresses } from './lan.ts';
 import { formatBuildReport, formatDeployReport, formatInspectReport } from './report.ts';
 
 /**
@@ -21,6 +23,7 @@ export interface CommandValues {
   readonly 'keep-maps'?: boolean | undefined;
   readonly port?: string | undefined;
   readonly host?: string | undefined;
+  readonly lan?: boolean | undefined;
 }
 
 export interface DeployValues {
@@ -32,6 +35,8 @@ export interface DeployValues {
 }
 
 const SAFE_FILE_NAME = /[^A-Za-z0-9._-]+/g;
+/** `dev --lan` — 같은 망의 휴대폰이 닿게 모든 망 카드에서 받는다 */
+const LAN_HOST = '0.0.0.0';
 
 function parseEngine(value: string | undefined): EngineName | undefined {
   if (value === undefined) return undefined;
@@ -42,6 +47,19 @@ function parseEngine(value: string | undefined): EngineName | undefined {
 function defaultOut(folder: string, version: string): string {
   const name = path.basename(path.resolve(folder)).replace(SAFE_FILE_NAME, '-') || 'game';
   return path.resolve(`${name}-${version}.sbp`);
+}
+
+/** 지원이 끝났거나 금지된 도구 버전이면 멈추고, 새 버전이 권장되면 알린다 */
+async function enforceSdkPolicy(version: string, io: CliIO): Promise<void> {
+  const verdict = await checkSdkPolicy(version);
+  if (verdict.kind === 'blocked') throw new CliError('SDK_VERSION_BLOCKED', verdict.message);
+  if (verdict.kind === 'update-recommended') io.err(`${verdict.message}\n`);
+}
+
+/** 개발 중에는 막지 않고 알리기만 한다 */
+export async function announceSdkPolicy(version: string, io: CliIO): Promise<void> {
+  const verdict = await checkSdkPolicy(version);
+  if (verdict.kind !== 'ok') io.err(`${verdict.message}\n`);
 }
 
 /** 설정 초안을 폴더에 쓴다(init 명령). 이름은 폴더 이름 */
@@ -84,6 +102,7 @@ export async function runBuild(
   options: { readonly folder: string; readonly values: CommandValues; readonly tool: { readonly name: string; readonly version: string } },
   io: CliIO,
 ): Promise<void> {
+  await enforceSdkPolicy(options.tool.version, io);
   io.out(formatBuildReport(await buildPackage(options)));
 }
 
@@ -101,12 +120,13 @@ export async function runInspect(file: string, io: CliIO): Promise<void> {
 }
 
 export async function runDeploy(
-  options: { readonly file: string | undefined; readonly values: DeployValues; readonly envKey: string | undefined },
+  options: { readonly file: string | undefined; readonly values: DeployValues; readonly envKey: string | undefined; readonly toolVersion: string },
   io: CliIO,
 ): Promise<void> {
-  const { file, values, envKey } = options;
+  const { file, values, envKey, toolVersion } = options;
   const { game, channel, note } = values;
   if (!file || !game || !channel) throw new CliError('USAGE', 'deploy <파일> --game <게임 ID> --channel <채널 키>');
+  await enforceSdkPolicy(toolVersion, io);
   const consoleOrigin = values.console ?? DEFAULT_CONSOLE_ORIGIN;
   assertConsoleOrigin(consoleOrigin);
   const apiKey = resolveApiKey(values['api-key'], envKey);
@@ -130,15 +150,19 @@ function playSdkPaths(): readonly string[] {
   return [path.join(here, 'v1.js'), path.join(here, '../dist/v1.js')];
 }
 
-export async function runDev(options: { readonly folder: string; readonly values: CommandValues }, io: CliIO): Promise<void> {
-  const { folder, values } = options;
+export async function runDev(options: { readonly folder: string | undefined; readonly values: CommandValues; readonly toolVersion: string }, io: CliIO): Promise<void> {
+  const { values } = options;
+  // 프로젝트 맨 위에서 실수로 돌려 소스까지 Wi-Fi 에 열리지 않게, 여는 폴더는 직접 적게 한다
+  if (values.lan && options.folder === undefined) throw new CliError('USAGE', 'dev <빌드 폴더> --lan');
+  if (values.lan && values.host !== undefined) throw new CliError('USAGE', '--lan은 --host와 같이 쓸 수 없어요');
+  const folder = options.folder ?? '.';
   const engine = parseEngine(values.engine);
   const info = await stat(path.resolve(folder)).catch(() => null);
   if (!info?.isDirectory()) throw new PackageError('FOLDER_MISSING', folder);
   const explicitPort = parsePort(values.port);
   const server = await startDevServer({
     folder,
-    host: values.host ?? '127.0.0.1',
+    host: values.host ?? (values.lan ? LAN_HOST : '127.0.0.1'),
     port: explicitPort ?? DEFAULT_DEV_PORT,
     fixedPort: explicitPort !== undefined,
     loadConfig: () => resolveConfig(folder, values.config),
@@ -148,7 +172,9 @@ export async function runDev(options: { readonly folder: string; readonly values
     ...(values['keep-maps'] ? { keepMaps: true } : {}),
   });
   io.out(`dev 서버 ${server.url}\n`);
+  if (values.lan) io.out(formatLanAccess(server.port, lanAddresses(networkInterfaces())));
   io.out(values.zone ? `게임존 ${values.zone} 에 맞춰 주입했어요.\n` : '게임존 없이 혼자 실행돼요. 광고와 결제는 시뮬레이션이에요.\n');
+  void announceSdkPolicy(options.toolVersion, io);
   await new Promise<void>((resolve) => {
     const stop = (): void => {
       void server.close().then(resolve);

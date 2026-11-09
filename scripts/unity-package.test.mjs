@@ -23,13 +23,21 @@ async function runtimeSource() {
 const pascal = (name) => `${name[0].toUpperCase()}${name.slice(1)}`;
 
 describe('Unity package assets', () => {
-  it('bundles the packager where the menu runs it, with no import left to resolve', async () => {
-    const menu = await read('Editor/BuildAndPackage.cs');
-    assert.match(menu, /"Editor", "Packager~", "package-build\.mjs"/);
-    const bundle = await read('Editor/Packager~/package-build.mjs');
-    const imports = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1]);
-    assert.ok(imports.length > 0);
-    assert.deepEqual(imports.filter((name) => !builtinModules.includes(name.replace(/^node:/, ''))), []);
+  it('bundles the tools where the menus run them, with no import left to resolve', async () => {
+    const [menu, deviceMenu] = await Promise.all([read('Editor/BuildAndPackage.cs'), read('Editor/DeviceTest.cs')]);
+    assert.match(menu, /"Editor", "Packager~", name/);
+    assert.match(menu, /PackagerScriptName = "package-build\.mjs"/);
+    assert.match(deviceMenu, /ServerScriptName = "device-test\.mjs"/);
+    for (const script of ['package-build.mjs', 'device-test.mjs']) {
+      const bundle = await read(`Editor/Packager~/${script}`);
+      const imports = [...bundle.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1]);
+      assert.ok(imports.length > 0, script);
+      assert.deepEqual(imports.filter((name) => !builtinModules.includes(name.replace(/^node:/, ''))), [], script);
+    }
+  });
+
+  it('ships the Play SDK the device test server hands out', async () => {
+    assert.match(await read('Editor/Packager~/v1.js'), /SBPlay/);
   });
 
   it('has a .meta for every file and folder', async () => {

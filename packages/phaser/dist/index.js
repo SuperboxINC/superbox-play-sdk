@@ -50,6 +50,80 @@ function toGameInsets(insets, canvas, scale, viewport) {
   };
 }
 
+// packages/phaser/src/sdk-policy.ts
+var SDK_POLICY_URL = "https://raw.githubusercontent.com/SuperboxINC/superbox-play-sdk/main/sdk-policy.json";
+var SCHEMA_VERSION = 1;
+var VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
+function isVersion(value) {
+  return typeof value === "string" && VERSION.test(value);
+}
+function isText(value) {
+  return typeof value === "string";
+}
+function isLower(version, than) {
+  const parts = version.split(".").map(Number);
+  const others = than.split(".").map(Number);
+  for (let index = 0; index < parts.length; index += 1) {
+    const difference = (parts[index] ?? 0) - (others[index] ?? 0);
+    if (difference !== 0) return difference < 0;
+  }
+  return false;
+}
+function parseSdkPolicy(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const { schemaVersion, minVersion, recommendedVersion, deniedVersions } = value;
+  if (schemaVersion !== SCHEMA_VERSION || !isVersion(minVersion) || !isVersion(recommendedVersion)) return null;
+  return { minVersion, recommendedVersion, deniedVersions: Array.isArray(deniedVersions) ? deniedVersions.filter(isText) : [] };
+}
+function evaluateSdkPolicy(policy, version) {
+  const latestVersion = policy.recommendedVersion;
+  if (policy.deniedVersions.includes(version)) return { kind: "blocked", latestVersion, message: `\uC774 \uB3C4\uAD6C \uBC84\uC804(${version})\uC740 \uBB38\uC81C\uAC00 \uC788\uC5B4 \uC4F8 \uC218 \uC5C6\uC5B4\uC694. \uCD5C\uC2E0 \uBC84\uC804\uC73C\uB85C \uC5C5\uB370\uC774\uD2B8\uD574 \uC8FC\uC138\uC694.` };
+  if (!isVersion(version)) return { kind: "ok" };
+  if (isLower(version, policy.minVersion)) return { kind: "blocked", latestVersion, message: `\uC774 \uB3C4\uAD6C \uBC84\uC804(${version})\uC740 \uC9C0\uC6D0\uC774 \uB05D\uB0AC\uC5B4\uC694. ${policy.minVersion} \uC774\uC0C1\uC73C\uB85C \uC5C5\uB370\uC774\uD2B8\uD574 \uC8FC\uC138\uC694.` };
+  if (isLower(version, latestVersion)) return { kind: "update-recommended", latestVersion, message: `\uC0C8 \uBC84\uC804\uC774 \uB098\uC654\uC5B4\uC694. \uC5C5\uB370\uC774\uD2B8\uB97C \uAD8C\uD574\uC694. (\uC9C0\uAE08 ${version} \xB7 \uCD5C\uC2E0 ${latestVersion})` };
+  return { kind: "ok" };
+}
+
+// packages/phaser/src/update-notice.ts
+var PLUGIN_VERSION = "0.2.0";
+var CHECKED_DATE_KEY = "superbox-play.update-notice";
+var TIMEOUT_MS = 2e3;
+var LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
+var INSTALL_SOURCE = "github:SuperboxINC/superbox-play-sdk";
+var BOX_STYLE = "position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483647;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 16px;border-radius:12px;background:#191f28;color:#fff;font:14px/1.5 sans-serif";
+var MESSAGE_STYLE = "flex:1 1 0;min-width:0;margin:0";
+var COMMAND_STYLE = "order:3;flex:1 1 100%;font:12px/1.5 monospace;opacity:.8;user-select:all;word-break:break-all";
+var CLOSE_STYLE = "min-height:32px;padding:0 12px;border:0;border-radius:8px;background:#3182f6;color:#fff;font:600 13px sans-serif;cursor:pointer";
+function element(document, tag, style, text) {
+  const created = document.createElement(tag);
+  created.style.cssText = style;
+  created.textContent = text;
+  return created;
+}
+function render(document, message, latestVersion) {
+  const box = element(document, "div", BOX_STYLE, "");
+  box.setAttribute("role", "status");
+  const close = element(document, "button", CLOSE_STYLE, "\uB2EB\uAE30");
+  close.type = "button";
+  close.addEventListener("click", () => box.remove());
+  box.append(element(document, "p", MESSAGE_STYLE, message), close, element(document, "code", COMMAND_STYLE, `npm install --save-dev ${INSTALL_SOURCE}#v${latestVersion}`));
+  document.body.append(box);
+}
+async function showUpdateNotice(win, now = /* @__PURE__ */ new Date()) {
+  try {
+    if (!LOCAL_HOST.test(win.location.hostname)) return;
+    const today = now.toISOString().slice(0, 10);
+    if (win.localStorage.getItem(CHECKED_DATE_KEY) === today) return;
+    win.localStorage.setItem(CHECKED_DATE_KEY, today);
+    const response = await win.fetch(SDK_POLICY_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const policy = response.ok ? parseSdkPolicy(await response.json()) : null;
+    if (!policy) return;
+    const verdict = evaluateSdkPolicy(policy, PLUGIN_VERSION);
+    if (verdict.kind !== "ok") render(win.document, verdict.message, verdict.latestVersion);
+  } catch {
+  }
+}
+
 // packages/phaser/src/plugin.ts
 var SUPERBOX_PLAY_PLUGIN_KEY = "SuperboxPlay";
 var SUPERBOX_PLAY_MAPPING = "sbplay";
@@ -146,6 +220,7 @@ var SuperboxPlayPlugin = class {
     const { events } = this.game;
     events.on("prestep", __privateMethod(this, _SuperboxPlayPlugin_instances, scanScenes_fn), this);
     events.on("postrender", __privateMethod(this, _SuperboxPlayPlugin_instances, checkFirstFrame_fn), this);
+    if (__privateGet(this, _options).updateNotice !== false) void showUpdateNotice(globalThis);
     const sdk = __privateMethod(this, _SuperboxPlayPlugin_instances, playWindow_fn).call(this).SBPlay;
     if (!sdk) return;
     sdk.on("app.pause", __privateGet(this, _onPause));

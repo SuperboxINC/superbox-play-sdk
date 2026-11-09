@@ -5,6 +5,7 @@ import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { verifyPackageFile } from '../../../../packages/package-core/src/index.ts';
+import { publishSdkPolicy } from '../../../../packages/package-core/src/test-support.ts';
 import { configs, DEFAULT_ZONE_ORIGIN, isAcceptableZone, PACKAGE_NAME, readBuildOptions } from './builder.ts';
 import { onAfterBuild, throwError } from './hooks.ts';
 import { packageCocosBuild } from './package-build.ts';
@@ -209,6 +210,17 @@ describe('hooks', () => {
     const { dest } = await makeProject();
     await writeFile(path.join(dest, '한글.png'), 'x');
     await assert.rejects(onAfterBuild({ platform: 'web-mobile' }, { dest }));
+  });
+
+  it('rejects when this tool version can no longer be used, and makes no package', async () => {
+    const { dest } = await makeProject();
+    const close = await publishSdkPolicy({ minVersion: '99.0.0', recommendedVersion: '99.0.0' });
+    try {
+      await assert.rejects(onAfterBuild({ platform: 'web-mobile' }, { dest }), /99\.0\.0/);
+      await assert.rejects(readFile(`${dest}-1.0.0.sbp`));
+    } finally {
+      await close();
+    }
   });
 });
 

@@ -138,15 +138,18 @@ await bundle({
   target: NODE_TARGET,
 });
 
-// Unity 메뉴가 Node 로 실행한다 — 한 파일에 묶어 패키지에 넣는다. `~` 폴더라 Unity 가 임포트하지 않고 .meta 도 필요 없다
+// Unity 메뉴가 Node 로 실행한다 — 입구마다 한 파일에 묶어 패키지에 넣는다. `~` 폴더라 Unity 가 임포트하지 않고 .meta 도 필요 없다
+const UNITY_TOOLS = 'engines/unity/superbox-play/Editor/Packager~';
 await bundle({
-  entryPoints: { 'package-build': 'engines/unity/packager/main.ts' },
-  outdir: 'engines/unity/superbox-play/Editor/Packager~',
+  entryPoints: { 'package-build': 'engines/unity/packager/main.ts', 'device-test': 'engines/unity/packager/device-test-main.ts' },
+  outdir: UNITY_TOOLS,
   outExtension: { '.js': '.mjs' },
   platform: 'node',
   format: 'esm',
   target: 'node14', // 메뉴는 Unity WebGL 모듈의 Node 로 돈다 — 낡은 Unity 의 Node 도 받는다(NodeFinder.MinimumMajorVersion 과 맞춘다)
 });
+// 기기 테스트 서버가 함께 내주는 Play SDK — CLI 의 사본과 같다
+await cp(path.join(root, 'packages/cli/dist/v1.js'), path.join(root, UNITY_TOOLS, 'v1.js'));
 
 if (withTypes) {
   // phaser 의 선언은 sdk 의 선언을 읽는다 — 동시에 돌리면 지워진 sdk 선언을 보고 실패한다

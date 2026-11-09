@@ -23,6 +23,7 @@ namespace Superbox.Play.Editor
         public string version;
         public string title;
         public string zoneOrigin;
+        public bool policyOnly;
     }
 
     [Serializable]
@@ -42,12 +43,15 @@ namespace Superbox.Play.Editor
         public PackagerWarning[] warnings;
         public string code;
         public string message;
+        public bool blocked;
+        public string latestVersion;
     }
 
     /// <summary>패키지에 묶어 넣은 패키징 스크립트(CLI 와 같은 규칙)를 Node 로 실행한다. 요청은 파일로 넘긴다 — 명령줄은 한글 게임 이름을 깨뜨릴 수 있다.</summary>
     internal static class PackagerProcess
     {
         private const int PackagingMilliseconds = 300000;
+        private const int PolicyCheckMilliseconds = 10000;
 
         internal readonly struct ProcessOutput
         {
@@ -63,10 +67,10 @@ namespace Superbox.Play.Editor
             public string Error { get; }
         }
 
-        internal static PackagerResult Run(string node, string script, PackagerRequest request, string requestFile)
+        internal static PackagerResult Run(string node, string script, PackagerRequest request, string requestFile, int timeoutMilliseconds = PackagingMilliseconds)
         {
             File.WriteAllText(requestFile, JsonUtility.ToJson(request), new UTF8Encoding(false));
-            var finished = Execute(node, $"{Quote(script)} {Quote(requestFile)}", PackagingMilliseconds);
+            var finished = Execute(node, $"{Quote(script)} {Quote(requestFile)}", timeoutMilliseconds);
             var answer = finished.Output.Split('\n').Select(line => line.Trim()).LastOrDefault(line => line.Length > 0);
             if (answer == null)
                 throw new PackagingException($"패키징 스크립트가 답하지 않았어요. {finished.Error}".Trim());
@@ -77,6 +81,19 @@ namespace Superbox.Play.Editor
             catch (ArgumentException)
             {
                 throw new PackagingException($"패키징 스크립트의 답을 읽지 못했어요. {finished.Error}".Trim());
+            }
+        }
+
+        /// <summary>도구 버전 정책을 묻는다 — 어떤 까닭으로든 확인하지 못하면 막지 않고, 에디터를 오래 붙잡지 않는다.</summary>
+        internal static PackagerResult CheckPolicy(string node, string script, string requestFile)
+        {
+            try
+            {
+                return Run(node, script, new PackagerRequest { policyOnly = true }, requestFile, PolicyCheckMilliseconds);
+            }
+            catch (Exception)
+            {
+                return new PackagerResult { ok = true };
             }
         }
 

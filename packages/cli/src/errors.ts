@@ -31,6 +31,7 @@ const MAX_DETAIL_LENGTH = 200;
 
 const CLI_ERRORS = {
   USAGE: { message: '명령이나 옵션이 틀렸어요. superbox-play --help로 사용법을 확인해 주세요.', exit: EXIT_USAGE },
+  SDK_VERSION_BLOCKED: { message: '도구를 업데이트해야 해요.', exit: EXIT_FAILED },
   CONFIG_EXISTS: { message: '설정 파일이 이미 있어요. 덮어쓰려면 --force를 붙여 주세요.', exit: EXIT_CONFIG },
   CONFIG_NOT_FOUND: { message: '--config로 지정한 설정 파일을 찾을 수 없어요.', exit: EXIT_CONFIG },
   FILE_NOT_FOUND: { message: '파일을 찾을 수 없어요.', exit: EXIT_INPUT },

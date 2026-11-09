@@ -36,21 +36,6 @@ __export(hooks_exports, {
 module.exports = __toCommonJS(hooks_exports);
 var import_node_path5 = __toESM(require("node:path"));
 
-// engines/cocos-creator/superbox-play/source/builder.ts
-var PACKAGE_NAME = "superbox-play";
-var DEFAULT_ZONE_ORIGIN = "https://game.superboxgo.com";
-function readBuildOptions(packages) {
-  const raw = packages?.[PACKAGE_NAME] ?? {};
-  return {
-    enabled: raw.enabled !== false,
-    zone: typeof raw.zone === "string" && raw.zone ? raw.zone : DEFAULT_ZONE_ORIGIN
-  };
-}
-
-// engines/cocos-creator/superbox-play/source/package-build.ts
-var import_promises7 = require("node:fs/promises");
-var import_node_path4 = __toESM(require("node:path"));
-
 // packages/package-core/src/encoding.ts
 var ENCODING_HEAD_BYTES = 64;
 var UNITY_MARK = /UnityWeb Compressed Content \((brotli|gzip)\)/;
@@ -1016,6 +1001,40 @@ function injectEntry(input) {
   };
 }
 
+// packages/package-core/src/sdk-policy.ts
+var SDK_POLICY_URL = "https://raw.githubusercontent.com/SuperboxINC/superbox-play-sdk/main/sdk-policy.json";
+var SCHEMA_VERSION = 1;
+var VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
+function isVersion(value) {
+  return typeof value === "string" && VERSION.test(value);
+}
+function isText(value) {
+  return typeof value === "string";
+}
+function isLower(version, than) {
+  const parts = version.split(".").map(Number);
+  const others = than.split(".").map(Number);
+  for (let index = 0; index < parts.length; index += 1) {
+    const difference = (parts[index] ?? 0) - (others[index] ?? 0);
+    if (difference !== 0) return difference < 0;
+  }
+  return false;
+}
+function parseSdkPolicy(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const { schemaVersion, minVersion, recommendedVersion, deniedVersions } = value;
+  if (schemaVersion !== SCHEMA_VERSION || !isVersion(minVersion) || !isVersion(recommendedVersion)) return null;
+  return { minVersion, recommendedVersion, deniedVersions: Array.isArray(deniedVersions) ? deniedVersions.filter(isText) : [] };
+}
+function evaluateSdkPolicy(policy, version) {
+  const latestVersion = policy.recommendedVersion;
+  if (policy.deniedVersions.includes(version)) return { kind: "blocked", latestVersion, message: `\uC774 \uB3C4\uAD6C \uBC84\uC804(${version})\uC740 \uBB38\uC81C\uAC00 \uC788\uC5B4 \uC4F8 \uC218 \uC5C6\uC5B4\uC694. \uCD5C\uC2E0 \uBC84\uC804\uC73C\uB85C \uC5C5\uB370\uC774\uD2B8\uD574 \uC8FC\uC138\uC694.` };
+  if (!isVersion(version)) return { kind: "ok" };
+  if (isLower(version, policy.minVersion)) return { kind: "blocked", latestVersion, message: `\uC774 \uB3C4\uAD6C \uBC84\uC804(${version})\uC740 \uC9C0\uC6D0\uC774 \uB05D\uB0AC\uC5B4\uC694. ${policy.minVersion} \uC774\uC0C1\uC73C\uB85C \uC5C5\uB370\uC774\uD2B8\uD574 \uC8FC\uC138\uC694.` };
+  if (isLower(version, latestVersion)) return { kind: "update-recommended", latestVersion, message: `\uC0C8 \uBC84\uC804\uC774 \uB098\uC654\uC5B4\uC694. \uC5C5\uB370\uC774\uD2B8\uB97C \uAD8C\uD574\uC694. (\uC9C0\uAE08 ${version} \xB7 \uCD5C\uC2E0 ${latestVersion})` };
+  return { kind: "ok" };
+}
+
 // packages/package-core/src/runtime-assets.generated.ts
 var BOOT_JS = '"use strict";(()=>{function A(e){let{win:t,loading:o}=e,n=e.now(),i=!1,l=()=>{var r,g,s;return!!((s=(g=(r=t.cc)==null?void 0:r.director)==null?void 0:g.getScene)!=null&&s.call(g))},d=t.console,a=d.error;d.error=(...r)=>{let[g]=r;r.length===1&&g instanceof Error&&!l()&&o.fail(e.classify(g.message),g.message),a.apply(d,r)};let c=e.setInterval(()=>{if(o.isComplete()||!o.api.autoComplete){e.clearInterval(c);return}t.cc&&!i&&(i=!0,o.api.progress(.3));let r=e.now()-n>6e4;!l()&&!r||(e.clearInterval(c),(l()||!o.hasFailed())&&o.api.complete())},100)}var q=()=>{};function x(e,t){try{return typeof e=="string"?new URL(e,t).href:e instanceof URL?e.href:e.url}catch{return null}}function X(e,t){let o=typeof e=="object"&&"method"in e?e.method:"GET";return((t==null?void 0:t.method)??o).toUpperCase()}function Z(e){e.then(t=>{var o;return(o=t==null?void 0:t.body)==null?void 0:o.cancel()}).catch(()=>{})}function R(e,t,o){if(o||t.length===0||typeof e.fetch!="function")return q;let n=e.fetch,i=(c,r)=>n.call(e,c,r),l=new Map;for(let c of t){let r=x(c,e.location.href);r&&l.set(r,i(c).catch(()=>null))}let d=(c,r)=>{let g=x(c,e.location.href),s=g&&X(c,r)==="GET"?l.get(g):void 0;return!g||!s?i(c,r):(l.delete(g),l.size===0&&a(),s.then(m=>m&&m.ok&&!m.bodyUsed?m:i(c,r)))},a=()=>{e.fetch===d&&(e.fetch=n)};return e.fetch=d,()=>{a();for(let c of l.values())Z(c);l.clear()}}var Y=/webgl|glctx|gl context|context lost/i,Q=/^script error\\.?$|ResizeObserver loop/i,J=/\\/sdk\\/play\\/v1\\.js([?#]|$)/,ee=/dynamically imported module|importing a module script failed|loading chunk|chunkloaderror|unable to (?:load|resolve) (?:specifier|bare)/i;function _(e,t){return o=>Y.test(o)||t()?"WEBGL_CONTEXT":e.engine==="html5"?"UNKNOWN":"ENGINE_INIT"}function T(e,t){try{return new URL(e,t.location.href).origin===t.location.origin}catch{return!1}}function M(e,t,o){let{win:n,loading:i}=e,l=d=>{let a=d.src;!a||J.test(a)||!T(a,n)||i.fail("SCRIPT_LOAD",a)};n.addEventListener("error",d=>{if(i.isComplete())return;let a=d.target;if(a instanceof HTMLScriptElement){l(a);return}if(a instanceof Element)return;let{message:c,filename:r}=d;!c||Q.test(c)||r&&!T(r,n)||i.fail(t(c),c)},!0),n.addEventListener("unhandledrejection",d=>{if(i.isComplete())return;let a=d.reason,c=a instanceof Error?`${a.name}: ${a.message}`:String(a);ee.test(c)&&i.fail("SCRIPT_LOAD",c)}),n.addEventListener("webglcontextcreationerror",o,!0)}var te=["mousedown","mouseup","click"];function w(e){Object.defineProperty(e,"preventDefault",{value:()=>{},configurable:!0})}function P(e,t,o){let n=!1,i=0,l=r=>{let g=r.target;n=!t.hasFocus()&&r.cancelable&&r.touches.length===1&&(g==null?void 0:g.tagName)==="CANVAS",n&&w(r)},d=r=>{n&&(n=!1,w(r),i=o()+800)},a=()=>{n=!1},c=r=>{!r.isTrusted||o()>=i||(r.type==="mousedown"&&r.preventDefault(),r.stopImmediatePropagation())};e.addEventListener("touchstart",l,!0),e.addEventListener("touchend",d,!0),e.addEventListener("touchcancel",a,!0);for(let r of te)e.addEventListener(r,c,!0)}function oe(e){return e instanceof Error?e.message:typeof e=="string"?e:String(e)}function k(e){let t=e.appInfo,o=0,n=!1,i=e.now(),l=-1/0,d=!1,a=!1,c=null,r=[],g=[],s=[],m=[],p=(u,f)=>{try{u(f)}catch(b){e.report(b)}},E=()=>{let u=l+100-e.now();u<=0?(l=e.now(),e.post({stage:"progress",progress:o})):d||(d=!0,e.later(()=>{d=!1,a||E()},u))},h=(u,f)=>{if(!(a||c)){c={code:u,message:f.slice(0,200)},e.view.showError(c,t),e.post({stage:"error",...c});for(let b of m)p(b,c)}};return{api:{get appInfo(){return t},autoComplete:!0,onReady(u){r.push(u),p(u,t)},onProgress(u){g.push(u),n&&p(u,o)},onComplete(u){a?p(u,void 0):s.push(u)},onError(u){m.push(u),c&&p(u,c)},progress(u){if(a||typeof u!="number"||!Number.isFinite(u))return;let f=Math.min(1,Math.max(0,u)),b=!n;if(n=!0,!(f<=o&&!b)){f>o&&(i=e.now()),o=Math.max(o,f),e.view.setProgress(o),E();for(let j of g)p(j,o)}},complete(){if(!a){a=!0,o=1,n=!0,e.view.setProgress(1),e.post({stage:"ready",elapsedMs:Math.round(e.now())}),e.view.hide(),c&&e.view.hideError();for(let u of g)p(u,1);for(let u of s.splice(0))p(u,void 0)}},error(u){let f=oe(u);h(e.classify(f),f)},hide(){e.view.hide()}},fail:h,setAppInfo(u){t={...t,...u},e.view.setAppInfo(t);for(let f of r)p(f,t)},isComplete:()=>a,hasFailed:()=>c!==null,hasProgress:()=>n,lastProgress:()=>o,lastMoveAt:()=>i}}var ne=/Mali-[34]|Mali-T[0-7]|Adreno (?:\\(TM\\) )?[2-4]\\d\\d|PowerVR SGX|PowerVR Rogue G|Intel\\(R\\) HD Graphics [2-5]/i;function O(e,t){let o=t.devicePixelRatio||1;return e!=="auto"?Math.min(e,o):t.mobile?ne.test(t.renderer)||t.memoryGb!==void 0&&t.memoryGb<=2||t.cores!==void 0&&t.cores<=2?1:(t.ios?(t.cores??0)>=6:(t.memoryGb??0)>=6)?o:Math.min(o,2):null}var U="sbp.reload";function B(e){try{let t=e(),o=Number.parseInt(t.getItem(U)??"0",10),n=Number.isFinite(o)?o:2;return n>=2?!1:(t.setItem(U,String(n+1)),!0)}catch{return!1}}function re(e,t){if(t===null)return e;let o=e==null?void 0:e.devicePixelRatio;return{...e,devicePixelRatio:typeof o=="number"?Math.min(o,t):t}}function ie(e,t){let{loading:o}=t;return function(i,l,d){o.api.autoComplete=!1,o.api.progress(0);let a=null;try{a=t.pixelRatio()}catch{a=null}let c=r=>{o.api.progress(r),d==null||d(r)};return e.call(this,i,re(l,a),c).then(r=>(t.afterFrame(()=>o.api.complete()),r),r=>{let g=r instanceof Error?r.message:String(r);throw o.fail(t.classify(g),g),r})}}function F(e){let{win:t,doc:o,loading:n}=e,i=!1,l,d=()=>{o.removeEventListener("load",a,!0),e.clearInterval(l)},a=()=>{if(i)return;let r=t.createUnityInstance;typeof r=="function"&&(i=!0,t.createUnityInstance=ie(r,e),d())},c=e.now();o.addEventListener("load",a,!0),l=e.setInterval(()=>{a(),!i&&(n.isComplete()||e.now()-c>3e4)&&d()},50)}var G=\'-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Segoe UI",sans-serif\',ae="\\uAC8C\\uC784\\uC744 \\uBD88\\uB7EC\\uC624\\uC9C0 \\uBABB\\uD588\\uC5B4\\uC694",se="\\uB2E4\\uC2DC \\uC2DC\\uB3C4",le="\\uB124\\uD2B8\\uC6CC\\uD06C \\uC0C1\\uD0DC\\uB97C \\uD655\\uC778\\uD558\\uACE0 \\uB2E4\\uC2DC \\uC2DC\\uB3C4\\uD574 \\uC8FC\\uC138\\uC694.",ce="\\uB2E4\\uB978 \\uC571\\uC744 \\uB2EB\\uACE0 \\uB2E4\\uC2DC \\uC2DC\\uB3C4\\uD574 \\uC8FC\\uC138\\uC694.";function de(e){let t=Number.parseInt(e.slice(1),16);return`rgba(${t>>16&255},${t>>8&255},${t&255},.24)`}function W(e){return Array.from((e??"").trim())[0]??""}function N(e,t,o){let n=null,i,l=null,d=-1,a=s=>(n==null?void 0:n.querySelector(s))??null,c=s=>{let m=()=>s.remove();s.addEventListener("error",m),s.complete&&s.naturalWidth===0&&s.getAttribute("src")&&m()},r=()=>{let s=a(".sbp-tip");if(!s||t.tips.length<2)return;let m=0;i=setInterval(()=>{m=(m+1)%t.tips.length,s.style.opacity="0",setTimeout(()=>{s.textContent=t.tips[m]??"",s.style.opacity=""},200)},4e3)},g=s=>{let m=a(".sbp-bar");if(!m)return;m.setAttribute("data-on",""),m.setAttribute("aria-valuenow",String(Math.round(s*100)));let p=m.firstElementChild;p&&(p.style.transform=`scaleX(${s})`)};return{attach(){if(n=e.getElementById("sbp-loading"),!n)return;let s=a(".sbp-icon img");s&&c(s),r(),d>=0&&g(d)},setProgress(s){d=s,g(s)},setAppInfo(s){var h;if(!n||n.getAttribute("data-mode")==="custom")return;n.style.setProperty("--sbp-bg",s.backgroundColor),n.style.setProperty("--sbp-primary",s.primaryColor),n.style.setProperty("--sbp-glow",de(s.primaryColor));let m=a(".sbp-name");m&&(m.textContent=s.title??"");let p=a(".sbp-icon span");p&&(p.textContent=W(s.title));let E=a(".sbp-icon");if(E&&(E.hidden=!s.iconUrl&&!W(s.title),s.iconUrl&&!t.iconUrl)){(h=a(".sbp-icon img"))==null||h.remove();let y=e.createElement("img");y.alt="",y.src=s.iconUrl,E.appendChild(y),c(y)}},hide(){i!==void 0&&clearInterval(i);let s=n??e.getElementById("sbp-loading");s&&(n=null,s.style.opacity="0",s.style.pointerEvents="none",setTimeout(()=>s.remove(),360))},showError(s,m){if(l)return;let p=e.createElement("div");p.id="sbp-error",p.setAttribute("role","alert"),p.style.cssText=`position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:${m.backgroundColor};color:#f2f4f6;font:400 14px/1.5 ${G};text-align:center;word-break:keep-all`;let E=e.createElement("p");E.textContent=ae,E.style.cssText="margin:0;font-size:17px;font-weight:600;line-height:26px";let h=e.createElement("p");h.textContent=s.code==="WEBGL_CONTEXT"?ce:le,h.style.cssText="margin:6px 0 0;color:rgba(255,255,255,.62);font-size:13px";let y=e.createElement("button");y.type="button",y.textContent=se,y.style.cssText=`margin-top:22px;min-width:132px;min-height:44px;padding:0 24px;border:0;border-radius:12px;background:${m.primaryColor};color:#fff;font:600 15px/1 ${G};cursor:pointer`,y.addEventListener("click",o),p.append(E,h,y),(e.body??e.documentElement).appendChild(p),l=p},hideError(){l==null||l.remove(),l=null}}}function D(e){let t=e.now(),o=e.resourceCount(),n=e.setInterval(()=>{let{loading:i}=e;if(i.isComplete()||i.hasFailed()){e.clearInterval(n);return}let l=e.resourceCount();(l!==o||e.isHidden())&&(o=l,t=e.now()),!(!i.hasProgress()||i.lastProgress()>=.9)&&(e.now()-Math.max(t,i.lastMoveAt())<6e4||(e.clearInterval(n),e.reload()||i.fail("WATCHDOG","loading stalled")))},1e4)}var ue=["www","api","cdn","console","games","static","admin","assets","play","sdk","test","developers","docs","mail","play-api","console-api","admin-api"],fe=/^[a-z0-9-]+$/,pe=/^[\\d.]+$/;function I(e,t){let o,n;try{o=new URL(e),n=new URL(t)}catch{return!1}if(o.origin!==e||o.protocol!==n.protocol||o.port!==n.port)return!1;let i=o.hostname,l=n.hostname;if(i===l)return!0;let d=l.split("."),a=l==="localhost"?l:d.length>2&&!pe.test(l)?d.slice(1).join("."):"";if(!a||!i.endsWith(`.${a}`))return!1;let c=i.slice(0,-a.length-1);return fe.test(c)&&!ue.includes(c)}function H(e,t){if(!e)return"*";let o=e[0];return o!==void 0&&I(o,t)?o:null}function V(e,t){return t!=="*"||!("message"in e)?e:Object.fromEntries(Object.entries(e).filter(([o])=>o!=="message"))}var ge=120,$=/^#[0-9A-Fa-f]{6}$/,me=/iPhone|iPad|iPod/i,K=/Android/i;function L(e){try{e()}catch{}}function v(e,t){let o=!1,n=()=>{o||(o=!0,t())};L(()=>e.requestAnimationFrame(()=>e.requestAnimationFrame(n))),e.setTimeout(n,ge)}function z(e,t){try{return e.performance.getEntriesByType(t)}catch{return[]}}function ye(e){var t;return((t=z(e,"navigation")[0])==null?void 0:t.type)==="reload"}function Ee(e){var t;try{let o=e.createElement("canvas").getContext("webgl");if(!o)return"";let n=o.getExtension("WEBGL_debug_renderer_info"),i=n?String(o.getParameter(n.UNMASKED_RENDERER_WEBGL)):"";return(t=o.getExtension("WEBGL_lose_context"))==null||t.loseContext(),i}catch{return""}}function Le(e,t){let o=e.navigator.userAgent,n=me.test(o),i=n||K.test(o),l=e.navigator;return O(t.maxDevicePixelRatio,{devicePixelRatio:e.devicePixelRatio,mobile:i,ios:n,memoryGb:l.deviceMemory,cores:l.hardwareConcurrency,renderer:i&&t.maxDevicePixelRatio==="auto"?Ee(e.document):""})}function he(e){if(typeof e!="object"||e===null)return null;let t=e;if(t.type!=="sbx.appInfo"||t.v!==1)return null;let o={};return typeof t.title=="string"&&t.title.length<=100&&(o.title=t.title),typeof t.iconUrl=="string"&&/^https?:\\/\\//.test(t.iconUrl)&&(o.iconUrl=t.iconUrl),typeof t.primaryColor=="string"&&$.test(t.primaryColor)&&(o.primaryColor=t.primaryColor),typeof t.backgroundColor=="string"&&$.test(t.backgroundColor)&&(o.backgroundColor=t.backgroundColor),o}function be(e,t,o){e.addEventListener("message",n=>{if(n.source!==e.parent||!I(n.origin,t.zoneOrigin))return;let i=he(n.data);i&&o.setAppInfo(i)})}function Ce(e,t){let{config:o}=t,n=e.document,i=e.parent!==e?H(e.location.ancestorOrigins,o.zoneOrigin):null,l=()=>e.performance.now(),d=!1,a=f=>{i!==null&&L(()=>e.parent.postMessage({type:"sbx.loading",v:1,...V(f,i)},i))},c=!1,r=[],g=f=>{c?a(f):r.push(f)},s=_(o,()=>d),m=N(n,o,()=>e.location.reload()),p=k({appInfo:{title:o.title,iconUrl:o.iconUrl,primaryColor:o.primaryColor,backgroundColor:o.backgroundColor},view:m,post:g,now:l,later:(f,b)=>e.setTimeout(f,b),report:f=>L(()=>console.error(f)),classify:s});e.SBPlayLoading=p.api;let E=!1,h=()=>{E||(E=!0,L(()=>m.attach()),v(e,()=>{a({stage:"shell"}),c=!0;for(let f of r.splice(0))a(f)}))};t.shell=h,n.addEventListener("DOMContentLoaded",h);let y;Object.defineProperty(t,"pixelRatio",{configurable:!0,get(){return y??(y=Le(e,o)),y}}),L(()=>M({win:e,config:o,loading:p},s,()=>{d=!0})),L(()=>{let f=R(e,o.earlyFetch,ye(e));p.api.onComplete(f)}),L(()=>{let f=e.navigator.audioSession;f&&(f.type="ambient")}),L(()=>{K.test(e.navigator.userAgent)&&P(e,n,l)}),i!==null&&L(()=>be(e,o,p));let u={setInterval:(f,b)=>e.setInterval(f,b),clearInterval:f=>e.clearInterval(f)};o.watchdog&&L(()=>D({loading:p,now:l,isHidden:()=>n.hidden,resourceCount:()=>z(e,"resource").length,reload:()=>B(()=>e.sessionStorage)?(e.location.reload(),!0):!1,...u})),o.engine==="unity"&&L(()=>F({win:e,doc:n,loading:p,now:l,classify:s,pixelRatio:()=>t.pixelRatio??null,afterFrame:f=>v(e,f),...u})),o.engine==="cocos"&&L(()=>A({win:e,loading:p,now:l,classify:s,...u})),e.addEventListener("load",()=>{o.engine!=="cocos"&&v(e,()=>{p.api.autoComplete&&!p.hasFailed()&&p.api.complete()})})}var S=window,C=S.SBPlayBoot;C!=null&&C.config&&!S.SBPlayLoading&&L(()=>Ce(S,C));})();';
 var LOADING_TEMPLATE = '<div id="sbp-loading" data-mode="%%MODE%%" style="%%VARS%%"><style>#sbp-loading{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(72vmax 46vmax at 50% 38%,var(--sbp-glow),transparent 70%),var(--sbp-bg);color:#f2f4f6;font:400 13px/1.5 -apple-system,BlinkMacSystemFont,Apple SD Gothic Neo,Noto Sans KR,Segoe UI,sans-serif;text-align:center;-webkit-user-select:none;user-select:none;transition:opacity .3s cubic-bezier(.16,1,.3,1)}#sbp-loading *{box-sizing:border-box;margin:0;padding:0}#sbp-loading .sbp-col{display:flex;flex-direction:column;align-items:center;margin-top:-5vh;animation:sbp-in .5s cubic-bezier(.16,1,.3,1) both}#sbp-loading .sbp-icon{position:relative;display:flex;align-items:center;justify-content:center;width:72px;height:72px;overflow:hidden;border-radius:18px;background:linear-gradient(150deg,var(--sbp-primary),var(--sbp-bg) 150%);box-shadow:0 12px 32px #00000073,inset 0 0 0 1px #ffffff1a;font-size:30px;font-weight:700}#sbp-loading .sbp-icon[hidden]{display:none}#sbp-loading .sbp-icon img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}#sbp-loading .sbp-name{min-height:26px;max-width:76vw;margin-top:18px;overflow:hidden;font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:26px;text-overflow:ellipsis;white-space:nowrap}#sbp-loading .sbp-bar{position:relative;width:min(200px,52vw);height:3px;margin-top:18px;overflow:hidden;border-radius:2px;background:#ffffff1f}#sbp-loading .sbp-bar i{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:2px;background:var(--sbp-primary);box-shadow:0 0 12px var(--sbp-primary);transform:scaleX(0);transform-origin:left center;transition:transform .2s linear}#sbp-loading .sbp-bar:not([data-on]) i{width:34%;transform:translate(-100%);animation:sbp-idle 1.5s ease-in-out infinite}#sbp-loading .sbp-tip{position:absolute;right:24px;bottom:calc(env(safe-area-inset-bottom,0px) + 44px);left:24px;color:#fff9;word-break:keep-all;transition:opacity .2s}@keyframes sbp-idle{to{transform:translate(300%)}}@keyframes sbp-in{0%{opacity:0;transform:translateY(8px)}}@media(prefers-reduced-motion:reduce){#sbp-loading,#sbp-loading *{animation:none!important;transition:none!important}#sbp-loading .sbp-bar:not([data-on]) i{width:100%;opacity:.35;transform:none}}</style><div class="sbp-col"><div class="sbp-icon"%%ICONATTR%%><span>%%LETTER%%</span>%%ICON%%</div><p class="sbp-name">%%TITLE%%</p><div class="sbp-bar" role="progressbar" aria-label="\uAC8C\uC784 \uBD88\uB7EC\uC624\uB294 \uC911" aria-valuemin="0" aria-valuemax="100"><i></i></div></div><p class="sbp-tip">%%TIP%%</p></div>';
@@ -1086,7 +1105,7 @@ var import_node_path2 = __toESM(require("node:path"), 1);
 var import_promises2 = require("node:fs/promises");
 var import_node_zlib = require("node:zlib");
 var DATA_FILE = /(^|\/)[^/]+\.data(\.(br|gz|unityweb))?$/;
-var VERSION = /\b(?:20\d\d|[6-9]\d{3})\.\d+\.\d+[abfp]\d+\b/;
+var VERSION2 = /\b(?:20\d\d|[6-9]\d{3})\.\d+\.\d+[abfp]\d+\b/;
 var HEAD_BYTES = 256 * 1024;
 function decompressHead(bytes, encoding) {
   return new Promise((resolve) => {
@@ -1112,7 +1131,7 @@ async function versionFromBuildInfo(files) {
   try {
     const parsed = JSON.parse(await (0, import_promises2.readFile)(info.absolute, "utf8"));
     const version = parsed.unityVersion;
-    return typeof version === "string" && VERSION.test(version) ? version : null;
+    return typeof version === "string" && VERSION2.test(version) ? version : null;
   } catch {
     return null;
   }
@@ -1126,7 +1145,7 @@ async function readUnityVersion(files) {
     const head = await readHead(data.absolute);
     const encoding = detectEncoding(data.path, head.subarray(0, ENCODING_HEAD_BYTES));
     const text = encoding ? await decompressHead(head, encoding) : Buffer.from(head);
-    return VERSION.exec(text.toString("latin1"))?.[0] ?? null;
+    return VERSION2.exec(text.toString("latin1"))?.[0] ?? null;
   } catch {
     return null;
   }
@@ -1455,6 +1474,53 @@ async function createPackage(options) {
   }
 }
 
+// packages/package-core/src/node/sdk-policy-check.ts
+var import_node_http = require("node:http");
+var import_node_https = require("node:https");
+var SDK_POLICY_URL_ENV = "SUPERBOX_PLAY_POLICY_URL";
+var POLICY_OFF = "off";
+var DEFAULT_TIMEOUT_MS = 2e3;
+var MAX_POLICY_CHARS = 16 * 1024;
+var OK = { kind: "ok" };
+function readJson(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const get = url.startsWith("http:") ? import_node_http.get : import_node_https.get;
+    const request = get(url, (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`status ${response.statusCode}`));
+        return;
+      }
+      let text = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        text += chunk;
+        if (text.length > MAX_POLICY_CHARS) request.destroy(new Error("too large"));
+      });
+      response.on("end", () => {
+        try {
+          resolve(JSON.parse(text));
+        } catch (error) {
+          reject(error);
+        }
+      });
+      response.on("error", reject);
+    });
+    const deadline = setTimeout(() => {
+      reject(new Error("timeout"));
+      request.destroy();
+    }, timeoutMs);
+    request.on("close", () => clearTimeout(deadline));
+    request.on("error", reject);
+  });
+}
+async function checkSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const configured = process.env[SDK_POLICY_URL_ENV];
+  if (configured === POLICY_OFF) return OK;
+  const policy = await readJson(configured || SDK_POLICY_URL, timeoutMs).then(parseSdkPolicy, () => null);
+  return policy ? evaluateSdkPolicy(policy, version) : OK;
+}
+
 // packages/package-core/src/node/verify.ts
 var CHUNK_BYTES = 4 * 1024 * 1024;
 
@@ -1462,7 +1528,7 @@ var CHUNK_BYTES = 4 * 1024 * 1024;
 var package_default = {
   package_version: 2,
   name: "superbox-play",
-  version: "0.1.1",
+  version: "0.2.0",
   title: "Superbox Play",
   description: "web-mobile \xB7 web-desktop \uBE4C\uB4DC\uB97C \uC288\uD37C\uBC15\uC2A4 \uD50C\uB808\uC774 \uD328\uD0A4\uC9C0(.sbp)\uB85C \uBB36\uACE0 \uAC8C\uC784 \uCF54\uB4DC\uC5D0\uC11C SuperboxPlay \uB97C \uC4F0\uAC8C \uD55C\uB2E4",
   author: "SUPERBOX",
@@ -1502,7 +1568,20 @@ var package_default = {
   }
 };
 
+// engines/cocos-creator/superbox-play/source/builder.ts
+var PACKAGE_NAME = "superbox-play";
+var DEFAULT_ZONE_ORIGIN = "https://game.superboxgo.com";
+function readBuildOptions(packages) {
+  const raw = packages?.[PACKAGE_NAME] ?? {};
+  return {
+    enabled: raw.enabled !== false,
+    zone: typeof raw.zone === "string" && raw.zone ? raw.zone : DEFAULT_ZONE_ORIGIN
+  };
+}
+
 // engines/cocos-creator/superbox-play/source/package-build.ts
+var import_promises7 = require("node:fs/promises");
+var import_node_path4 = __toESM(require("node:path"));
 var DEFAULT_VERSION2 = "1.0.0";
 var MAX_TITLE_LENGTH3 = 100;
 async function readJsonIfExists(file) {
@@ -1546,6 +1625,9 @@ function projectDir(dest) {
 async function onAfterBuild(options, result) {
   const { enabled, zone } = readBuildOptions(options.packages);
   if (!enabled) return;
+  const verdict = await checkSdkPolicy(package_default.version);
+  if (verdict.kind === "blocked") throw new Error(verdict.message);
+  if (verdict.kind === "update-recommended") console.warn(`[superbox-play] ${verdict.message}`);
   const report = await packageCocosBuild({ dest: result.dest, projectDir: projectDir(result.dest), zoneOrigin: zone });
   console.info(`[superbox-play] ${report.outPath} (${report.manifest.totals.count}\uAC1C \uD30C\uC77C, ${report.packageBytes}B)`);
   for (const item of report.warnings) console.warn(`[superbox-play] ${item.code}: ${item.message}`);

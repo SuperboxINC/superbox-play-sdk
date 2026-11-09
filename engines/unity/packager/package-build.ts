@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
-import { VERSION_PATTERN } from '../../../packages/package-core/src/browser.ts';
-import { CONFIG_FILE, createPackage, loadConfigFile, type PackageReport, type SuperboxConfig } from '../../../packages/package-core/src/index.ts';
+import { VERSION_PATTERN, type PackageWarning } from '../../../packages/package-core/src/browser.ts';
+import { checkSdkPolicy, CONFIG_FILE, createPackage, loadConfigFile, type PackageReport, type SuperboxConfig } from '../../../packages/package-core/src/index.ts';
 import unityPackage from '../superbox-play/package.json' with { type: 'json' };
 
 /**
@@ -30,11 +30,24 @@ function withPlayerSettings(config: SuperboxConfig, request: UnityPackageRequest
   return { ...config, ...(version === undefined ? {} : { version }), ...(title === undefined ? {} : { title }), engine: 'unity' };
 }
 
-export async function packageUnityBuild(request: UnityPackageRequest): Promise<PackageReport> {
+/** 메뉴가 오래 걸리는 빌드 전에 묻는 도구 버전 판정 — 막을지와 알릴 말 */
+export async function unityPolicyAnswer(): Promise<{ readonly ok: true; readonly blocked: boolean; readonly message: string; readonly latestVersion: string }> {
+  const verdict = await checkSdkPolicy(unityPackage.version);
+  if (verdict.kind === 'ok') return { ok: true, blocked: false, message: '', latestVersion: '' };
+  return { ok: true, blocked: verdict.kind === 'blocked', message: verdict.message, latestVersion: verdict.latestVersion };
+}
+
+/** 프로젝트의 설정 파일 + Player Settings — 패키징과 기기 테스트가 같은 값을 쓴다 */
+export async function loadUnityConfig(request: UnityPackageRequest): Promise<{ readonly config: SuperboxConfig; readonly warnings: readonly PackageWarning[] }> {
   const configPath = path.join(request.projectDir, CONFIG_FILE);
   const hasConfig = await stat(configPath).then(() => true, () => false);
   const loaded = hasConfig ? await loadConfigFile(configPath) : { config: {}, warnings: [] };
-  const config = withPlayerSettings(loaded.config, request);
+  return { config: withPlayerSettings(loaded.config, request), warnings: loaded.warnings };
+}
+
+export async function packageUnityBuild(request: UnityPackageRequest): Promise<PackageReport> {
+  const loaded = await loadUnityConfig(request);
+  const { config } = loaded;
   const report = await createPackage({
     folder: request.folder,
     out: `${path.resolve(request.folder)}-${config.version ?? DEFAULT_VERSION}.sbp`,

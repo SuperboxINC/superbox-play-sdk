@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { main } from './cli.ts';
+import { announceSdkPolicy } from './commands.ts';
 import { describeError, CliError, exitCodeOf } from './errors.ts';
 import { formatBytes } from './report.ts';
 import { PackageError } from '../../package-core/src/browser.ts';
+import { publishSdkPolicy } from '../../package-core/src/test-support.ts';
 
 let root = '';
 let counter = 0;
@@ -64,6 +66,20 @@ describe('general', () => {
     assert.ok(unknown.err.startsWith('오류 [USAGE]'));
     assert.equal((await run('build', '--nope')).code, 2);
     assert.equal((await run('inspect')).code, 2);
+  });
+});
+
+describe('dev --lan', () => {
+  it('asks for the folder rather than opening the current one to the network', async () => {
+    const result = await run('dev', '--lan');
+    assert.equal(result.code, 2);
+    assert.ok(result.err.startsWith('오류 [USAGE]'), result.err);
+  });
+
+  it('refuses --host, whose address the printed QR code would not match', async () => {
+    const result = await run('dev', await writeBuild(), '--lan', '--host', '127.0.0.1');
+    assert.equal(result.code, 2);
+    assert.ok(result.err.includes('--host'), result.err);
   });
 });
 
@@ -228,6 +244,59 @@ describe('error table', () => {
     assert.ok(describeError(new CliError('USAGE')).startsWith('오류 [USAGE] '));
     assert.ok(describeError(new PackageError('NOT_STORED', 'x')).includes('(x)'));
     assert.ok(describeError('plain').startsWith('오류 [INTERNAL] '));
+  });
+});
+
+describe('tool version policy', () => {
+  async function withPolicy(policy: Readonly<Record<string, unknown>>, task: () => Promise<void>): Promise<void> {
+    const close = await publishSdkPolicy(policy);
+    try {
+      await task();
+    } finally {
+      await close();
+    }
+  }
+
+  it('only mentions a new version while developing, even for one that can no longer be used', async () => {
+    await withPolicy({ minVersion: '99.0.0', recommendedVersion: '99.0.0' }, async () => {
+      let said = '';
+      await announceSdkPolicy('0.1.0', { out: () => undefined, err: (text) => void (said += text) });
+      assert.ok(said.includes('99.0.0'), said);
+    });
+  });
+
+  it('stops the build when this version can no longer be used', async () => {
+    await withPolicy({ minVersion: '99.0.0', recommendedVersion: '99.0.0' }, async () => {
+      await writeBuild();
+      const { code, err } = await run('build', 'build');
+      assert.equal(code, 1);
+      assert.ok(err.includes('SDK_VERSION_BLOCKED'), err);
+      assert.deepEqual((await readdir('.')).filter((name) => name.endsWith('.sbp')), []);
+    });
+  });
+
+  it('builds and recommends the update when a newer version is recommended', async () => {
+    await withPolicy({ minVersion: '0.0.1', recommendedVersion: '99.0.0' }, async () => {
+      await writeBuild();
+      const { code, err } = await run('build', 'build');
+      assert.equal(code, 0, err);
+      assert.ok(err.includes('99.0.0'), err);
+      assert.equal((await readdir('.')).filter((name) => name.endsWith('.sbp')).length, 1);
+    });
+  });
+
+  it('stops deploy before it asks for an API key', async () => {
+    await withPolicy({ minVersion: '99.0.0', recommendedVersion: '99.0.0' }, async () => {
+      const { code, err } = await run('deploy', 'game.sbp', '--game', 'g', '--channel', 'c');
+      assert.equal(code, 1);
+      assert.ok(err.includes('SDK_VERSION_BLOCKED'), err);
+    });
+  });
+
+  it('still reports a wrong command before it looks at the network', async () => {
+    await withPolicy({ minVersion: '99.0.0', recommendedVersion: '99.0.0' }, async () => {
+      assert.equal((await run('deploy')).code, 2);
+    });
   });
 });
 

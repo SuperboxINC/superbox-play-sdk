@@ -26,6 +26,8 @@ export interface SuperboxPlayOptions {
     readonly autoComplete?: boolean;
     /** 파일 하나를 못 받아도 게임을 그대로 띄운다. 기본 false — 오류 화면과 다시 시도를 보인다. */
     readonly ignoreLoadErrors?: boolean;
+    /** 로컬에서 실행할 때 새 SDK 버전을 화면에 알린다. 기본 true — 운영 주소에서는 켜져 있어도 아무것도 하지 않는다. */
+    readonly updateNotice?: boolean;
 }
 export declare class SuperboxPlayPlugin {
     #private;

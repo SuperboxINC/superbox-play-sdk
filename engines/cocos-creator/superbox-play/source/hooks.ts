@@ -1,4 +1,6 @@
 import path from 'node:path';
+import { checkSdkPolicy } from '../../../../packages/package-core/src/index.ts';
+import extensionPackage from '../package.json' with { type: 'json' };
 import { readBuildOptions } from './builder.ts';
 import { packageCocosBuild } from './package-build.ts';
 
@@ -27,6 +29,9 @@ function projectDir(dest: string): string {
 export async function onAfterBuild(options: BuildTaskOptions, result: BuildResult): Promise<void> {
   const { enabled, zone } = readBuildOptions(options.packages);
   if (!enabled) return;
+  const verdict = await checkSdkPolicy(extensionPackage.version);
+  if (verdict.kind === 'blocked') throw new Error(verdict.message);
+  if (verdict.kind === 'update-recommended') console.warn(`[superbox-play] ${verdict.message}`);
   const report = await packageCocosBuild({ dest: result.dest, projectDir: projectDir(result.dest), zoneOrigin: zone });
   console.info(`[superbox-play] ${report.outPath} (${report.manifest.totals.count}개 파일, ${report.packageBytes}B)`);
   for (const item of report.warnings) console.warn(`[superbox-play] ${item.code}: ${item.message}`);

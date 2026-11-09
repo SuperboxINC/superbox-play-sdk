@@ -1,5 +1,22 @@
 import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { crc32 } from './crc32.ts';
+import { SDK_POLICY_URL_ENV } from './node/sdk-policy-check.ts';
+
+/** 버전 정책을 내주는 시험 서버 — 정책 주소를 이 서버로 돌리고, 돌려받은 함수가 서버를 닫고 주소를 되돌린다. */
+export async function publishSdkPolicy(policy: Readonly<Record<string, unknown>>): Promise<() => Promise<void>> {
+  const previous = process.env[SDK_POLICY_URL_ENV];
+  const server = createServer((_request, response) => response.end(JSON.stringify({ schemaVersion: 1, deniedVersions: [], ...policy })));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  process.env[SDK_POLICY_URL_ENV] = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+  return () =>
+    new Promise<void>((resolve) => {
+      if (previous === undefined) delete process.env[SDK_POLICY_URL_ENV];
+      else process.env[SDK_POLICY_URL_ENV] = previous;
+      server.close(() => resolve());
+    });
+}
 
 /**
  * 시험 전용 — 거절 규칙을 시험하려고 일부러 틀린 ZIP 도 만들 수 있는 조립기. 빌드 진입에 들어가지 않는다.

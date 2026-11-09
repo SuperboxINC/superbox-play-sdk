@@ -21,6 +21,7 @@ namespace Superbox.Play.Editor
         private const string OutputFolder = "Build/SuperboxPlay";
         private const string PlayerFolderName = "WebGL";
         private const string RequestFile = "Temp/superbox-play-package.json";
+        private const string PackagerScriptName = "package-build.mjs";
 
         [MenuItem(BuildMenu)]
         public static void Run() => Perform(zoneOrigin: null);
@@ -31,9 +32,13 @@ namespace Superbox.Play.Editor
 
         [MenuItem(BuildMenu, true)]
         [MenuItem(LocalZoneMenu, true)]
-        private static bool CanRun() => !EditorApplication.isPlayingOrWillChangePlaymode && !EditorApplication.isCompiling && !BuildPipeline.isBuildingPlayer;
+        internal static bool CanRun() => !EditorApplication.isPlayingOrWillChangePlaymode && !EditorApplication.isCompiling && !BuildPipeline.isBuildingPlayer;
 
-        private static void Perform(string zoneOrigin)
+        private static void Perform(string zoneOrigin) =>
+            BuildThen(PackagerScriptName, (node, script, projectDir, playerFolder) => Report(Package(node, script, projectDir, playerFolder, zoneOrigin)));
+
+        /// <summary>WebGL 빌드를 끝낸 뒤 <paramref name="next"/> 를 부른다(Node, 도구 스크립트, 프로젝트 폴더, 빌드 폴더) — 실패는 창으로 알리고, 배치 모드는 그대로 던진다.</summary>
+        internal static void BuildThen(string scriptName, Action<string, string, string, string> next)
         {
             try
             {
@@ -46,10 +51,11 @@ namespace Superbox.Play.Editor
                 }
                 // 오래 걸리는 빌드 전에 패키징에 필요한 것부터 본다
                 var node = NodeFinder.Find() ?? throw new PackagingException($"Node {NodeFinder.MinimumMajorVersion} 이상을 찾지 못했어요. Node를 설치한 뒤 다시 실행해 주세요.");
-                var script = PackagerScript();
+                var script = ToolScript(scriptName);
                 var projectDir = Path.GetDirectoryName(Application.dataPath);
+                StopIfVersionBlocked(node, projectDir);
                 var playerFolder = BuildPlayer(projectDir);
-                Report(Package(node, script, projectDir, playerFolder, zoneOrigin));
+                next(node, script, projectDir, playerFolder);
             }
             // 배치 모드는 그대로 던진다 — 에디터가 오류를 찍고 0 이 아닌 코드로 끝난다
             catch (Exception error) when (!Application.isBatchMode)
@@ -63,6 +69,16 @@ namespace Superbox.Play.Editor
             }
         }
 
+        // 오래 걸리는 빌드 전에 묻는다 — 공개 저장소의 버전 정책에서 지원이 끝난 SDK 면 여기서 멈춘다
+        private static void StopIfVersionBlocked(string node, string projectDir)
+        {
+            var policy = PackagerProcess.CheckPolicy(node, PackagerScript(), Path.Combine(projectDir, RequestFile));
+            if (policy.blocked)
+                throw new PackagingException(policy.message);
+            if (!string.IsNullOrEmpty(policy.message))
+                Debug.LogWarning($"{LogPrefix} {policy.message}");
+        }
+
         // BuildPlayer 에 맡기면 플랫폼이 말없이 바뀌고, 전환의 도메인 리로드가 패키징을 끊을 수 있다 — 먼저 바꾸고 다시 누르게 한다
         private static void OfferWebGlSwitch()
         {
@@ -72,10 +88,12 @@ namespace Superbox.Play.Editor
                 EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WebGL, BuildTarget.WebGL);
         }
 
-        internal static string PackagerScript()
+        internal static string PackagerScript() => ToolScript(PackagerScriptName);
+
+        internal static string ToolScript(string name)
         {
             var package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(BuildAndPackage).Assembly);
-            var script = package == null ? null : Path.Combine(package.resolvedPath, "Editor", "Packager~", "package-build.mjs");
+            var script = package == null ? null : Path.Combine(package.resolvedPath, "Editor", "Packager~", name);
             if (script == null || !File.Exists(script))
                 throw new PackagingException("패키징 스크립트가 없어요. Package Manager에서 com.superbox.play를 다시 설치해 주세요.");
             return script;

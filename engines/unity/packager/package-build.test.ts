@@ -4,7 +4,37 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { verifyPackageFile } from '../../../packages/package-core/src/index.ts';
-import { packageUnityBuild } from './package-build.ts';
+import { publishSdkPolicy } from '../../../packages/package-core/src/test-support.ts';
+import { packageUnityBuild, unityPolicyAnswer } from './package-build.ts';
+
+describe('Unity 메뉴의 버전 정책', () => {
+  it('지원이 끝난 버전이면 막으라고 답한다', async () => {
+    const close = await publishSdkPolicy({ minVersion: '99.0.0', recommendedVersion: '99.0.0' });
+    try {
+      const answer = await unityPolicyAnswer();
+      assert.equal(answer.blocked, true);
+      assert.ok(answer.message.includes('99.0.0'));
+    } finally {
+      await close();
+    }
+  });
+
+  it('권장 버전 미만이면 알리기만 한다', async () => {
+    const close = await publishSdkPolicy({ minVersion: '0.0.1', recommendedVersion: '99.0.0' });
+    try {
+      const answer = await unityPolicyAnswer();
+      assert.equal(answer.blocked, false);
+      assert.ok(answer.message.includes('99.0.0'));
+      assert.equal(answer.latestVersion, '99.0.0');
+    } finally {
+      await close();
+    }
+  });
+
+  it('정책을 볼 수 없으면 막지 않고 할 말도 없다', async () => {
+    assert.deepEqual(await unityPolicyAnswer(), { ok: true, blocked: false, message: '', latestVersion: '' });
+  });
+});
 
 const INDEX = '<!DOCTYPE html><html><head><title>Game</title></head><body><canvas id="unity-canvas"></canvas><script src="Build/Game.loader.js"></script></body></html>';
 

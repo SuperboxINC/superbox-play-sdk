@@ -1,8 +1,10 @@
 import { createReadStream, type Stats } from 'node:fs';
-import { lstat, open, readFile } from 'node:fs/promises';
+import { lstat, open, readFile, realpath } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
+import { promisify } from 'node:util';
+import { brotliDecompress, gunzip } from 'node:zlib';
 import { contentTypeFor, detectEncoding, ENCODING_HEAD_BYTES, isSafeBuildPath, PackageError } from '../../package-core/src/browser.ts';
 import { BUNDLED_RUNTIME, prepareBuild, type EngineName, type PreparedFile, type SuperboxConfig } from '../../package-core/src/index.ts';
 import { CliError, describeError } from './errors.ts';
@@ -15,12 +17,25 @@ import { CliError, describeError } from './errors.ts';
  * 까닭: SDK 는 `<script src>` 출처를 게임존 출처로 믿으므로 같은 출처면 설정 없이 맞고, 부모가 없어 독립 실행(localhost 시뮬레이션)으로 돈다.
  * 운영 SDK 를 받으면 인터넷이 필요하고 운영 CDN 이 아닌 곳에서 부모 없이 돌아 시험이 달라진다.
  * SDK 파일은 CLI 빌드 때 옆에 복사해 둔 사본이다 — 저장소 경로를 실행 때 찾으면 npm 으로 깔린 CLI 에서 깨진다.
+ *
+ * 이 컴퓨터 밖에서 받을 때(휴대폰 · LAN)는 압축을 풀어 내린다 — 평문 http 의 다른 기기에서는 브라우저가 Content-Encoding: br 을 풀지 않는다.
+ * 같은 망의 누구나 닿으므로 점으로 시작하는 파일 · 폴더(.env · .git)는 내리지 않는다.
  */
 export const DEFAULT_DEV_PORT = 8300;
 const PORT_TRIES = 11;
 const SDK_ROUTE = '/sdk/play/v1.js';
 const ENTRY_ROUTE = '/index.html';
 const VALID_HOST_HEADER = /^[A-Za-z0-9.:[\]-]+$/;
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost', '::1']);
+const DECODERS = { br: promisify(brotliDecompress), gzip: promisify(gunzip) } as const;
+/** 휴대폰 브라우저가 받지 못할 크기까지 풀지 않는다 */
+const MAX_DECODED_BYTES = 1024 * 1024 * 1024;
+
+interface DecodedFile {
+  readonly mtimeMs: number;
+  readonly size: number;
+  readonly bytes: Promise<Buffer | null>;
+}
 
 export interface DevServerOptions {
   readonly folder: string;
@@ -75,9 +90,33 @@ function preparedBytes(file: PreparedFile | undefined): Uint8Array | null {
   return file?.source.kind === 'bytes' ? file.source.bytes : null;
 }
 
+function isHidden(relative: string): boolean {
+  return relative.split('/').some((segment) => segment.startsWith('.'));
+}
+
 export async function startDevServer(options: DevServerOptions): Promise<DevServerHandle> {
   const root = path.resolve(options.folder);
+  const servesOtherDevices = !LOOPBACK_HOSTS.has(options.host);
+  const decodedFiles = new Map<string, DecodedFile>();
   let ownOrigin = '';
+
+  /** 중간 폴더가 링크여도 빌드 폴더 밖으로 나가지 않는다 */
+  const isInsideRoot = (absolute: string): Promise<boolean> =>
+    Promise.all([realpath(root), realpath(path.dirname(absolute))]).then(
+      ([realRoot, realParent]) => realParent === realRoot || realParent.startsWith(realRoot + path.sep),
+      () => false,
+    );
+
+  /** 파일마다 한 번만 푼다 — 새로고침이나 여러 기기의 요청마다 다시 풀지 않게. 크기나 시각이 바뀌면(다시 빌드) 새로 푼다. */
+  const decodedBytes = (absolute: string, encoding: keyof typeof DECODERS, info: Stats): Promise<Buffer | null> => {
+    const known = decodedFiles.get(absolute);
+    if (known && known.mtimeMs === info.mtimeMs && known.size === info.size) return known.bytes;
+    const bytes = readFile(absolute)
+      .then((source) => DECODERS[encoding](source, { maxOutputLength: MAX_DECODED_BYTES }))
+      .catch(() => null);
+    decodedFiles.set(absolute, { mtimeMs: info.mtimeMs, size: info.size, bytes });
+    return bytes;
+  };
 
   const serveStatic = async (relative: string, response: ServerResponse, head: boolean): Promise<void> => {
     const absolute = path.resolve(root, relative);
@@ -86,11 +125,19 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       return;
     }
     const info: Stats | null = await lstat(absolute).catch(() => null);
-    if (!info?.isFile()) {
+    if (!info?.isFile() || !(await isInsideRoot(absolute))) {
       send(response, 404, 'text/plain; charset=utf-8', 'not found', head);
       return;
     }
     const encoding = detectEncoding(relative, await fileHead(absolute));
+    if (encoding && servesOtherDevices) {
+      const decoded = await decodedBytes(absolute, encoding, info);
+      if (decoded) {
+        response.writeHead(200, { 'Content-Type': contentTypeFor(relative, encoding), 'Cache-Control': 'no-store', 'Content-Length': decoded.length });
+        response.end(head ? undefined : decoded);
+        return;
+      }
+    }
     response.writeHead(200, {
       'Content-Type': contentTypeFor(relative, encoding),
       'Cache-Control': 'no-store',
@@ -101,7 +148,8 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       response.end();
       return;
     }
-    createReadStream(absolute).pipe(response);
+    // 다시 빌드하느라 파일이 사라져도 서버는 죽지 않는다
+    createReadStream(absolute).on('error', () => response.destroy()).pipe(response);
   };
 
   const prepare = async (request: IncomingMessage): Promise<readonly PreparedFile[]> => {
@@ -145,7 +193,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     }
     const route = pathname === '/' ? ENTRY_ROUTE : pathname;
     const relative = route.slice(1);
-    if (!isSafeBuildPath(relative)) {
+    if (!isSafeBuildPath(relative) || (servesOtherDevices && isHidden(relative))) {
       send(response, 404, 'text/plain; charset=utf-8', 'not found', head);
       return;
     }

@@ -2,6 +2,7 @@ import type { SafeArea, SBPlay, SBPlayLoading, SessionInfo } from '@superbox-pla
 import type { LoaderFileLike, LoaderLike, PhaserGameLike, PhaserSceneLike, PluginManagerLike } from './phaser-like.ts';
 import { createProgressMixer } from './progress-mixer.ts';
 import { toGameInsets } from './safe-area.ts';
+import { showUpdateNotice, type UpdateNoticeWindow } from './update-notice.ts';
 
 /**
  * Phaser 전역 플러그인 — 3.60 이상과 4 에서 그대로 돈다(둘 다 실제로 돌려 시험한다).
@@ -31,6 +32,8 @@ export interface SuperboxPlayOptions {
   readonly autoComplete?: boolean;
   /** 파일 하나를 못 받아도 게임을 그대로 띄운다. 기본 false — 오류 화면과 다시 시도를 보인다. */
   readonly ignoreLoadErrors?: boolean;
+  /** 로컬에서 실행할 때 새 SDK 버전을 화면에 알린다. 기본 true — 운영 주소에서는 켜져 있어도 아무것도 하지 않는다. */
+  readonly updateNotice?: boolean;
 }
 
 const ZERO_INSETS: SafeArea = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -100,6 +103,7 @@ export class SuperboxPlayPlugin {
     const { events } = this.game;
     events.on('prestep', this.#scanScenes, this);
     events.on('postrender', this.#checkFirstFrame, this);
+    if (this.#options.updateNotice !== false) void showUpdateNotice(globalThis as unknown as UpdateNoticeWindow);
 
     const sdk = this.#playWindow().SBPlay;
     if (!sdk) return;

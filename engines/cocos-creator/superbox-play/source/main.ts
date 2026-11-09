@@ -1,4 +1,6 @@
+import extensionPackage from '../package.json' with { type: 'json' };
 import { DEFAULT_ZONE_ORIGIN, PACKAGE_NAME } from './builder.ts';
+import { notifyUpdate, type UpdateNoticeEditor } from './update-notice.ts';
 
 /**
  * 확장의 메인 프로세스 — 상단 메뉴 Superbox Play > Build & Package.
@@ -38,7 +40,10 @@ export interface EditorApi {
   };
 }
 
-declare const Editor: EditorApi;
+declare const Editor: EditorApi & UpdateNoticeEditor & { readonly Project: { readonly path: string } };
+
+/** 에디터 창이 다 뜬 뒤에 묻는다 — 뜨는 중에 띄우면 창 뒤로 숨는다 */
+const UPDATE_NOTICE_DELAY_MS = 5000;
 
 async function lastWebBuildOptions(editor: EditorApi): Promise<BuildOptions | null> {
   const info = (await editor.Message.request('builder', 'query-tasks-info')) as { readonly list?: readonly BuildTask[] };
@@ -92,6 +97,12 @@ export const methods = {
   buildAndPackageForLocalZone: (): Promise<void> => buildAndPackage(Editor, LOCAL_ZONE_ORIGIN),
 };
 
-export function load(): void {}
+let updateNoticeTimer: ReturnType<typeof setTimeout> | undefined;
 
-export function unload(): void {}
+export function load(): void {
+  updateNoticeTimer = setTimeout(() => void notifyUpdate({ editor: Editor, projectDir: Editor.Project.path, version: extensionPackage.version }), UPDATE_NOTICE_DELAY_MS);
+}
+
+export function unload(): void {
+  clearTimeout(updateNoticeTimer);
+}

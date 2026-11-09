@@ -27,6 +27,7 @@ build 옵션
 dev 옵션
   --port <번호>       포트 (기본: 8300부터 빈 포트)
   --host <주소>       받을 주소 (기본: 127.0.0.1)
+  --lan               같은 Wi-Fi의 휴대폰에서 열 수 있게 띄우고 QR 코드를 보여 줘요
   --zone <주소>       게임존 주소 (기본: dev 서버 자신 — 인터넷 없이 시뮬레이션으로 돌아요)
   --config · --engine · --keep-maps  build와 같아요
 
@@ -51,6 +52,7 @@ const OPTIONS = {
   'keep-maps': { type: 'boolean' },
   port: { type: 'string' },
   host: { type: 'string' },
+  lan: { type: 'boolean' },
   force: { type: 'boolean' },
   game: { type: 'string' },
   channel: { type: 'string' },
@@ -108,10 +110,10 @@ export async function main(argv: readonly string[], rawIo: CliIO): Promise<numbe
         return EXIT_OK;
       }
       case 'dev':
-        await runDev({ folder: rest[0] ?? '.', values }, io);
+        await runDev({ folder: rest[0], values, toolVersion: packageJson.version }, io);
         return EXIT_OK;
       case 'deploy':
-        await runDeploy({ file: rest[0], values, envKey: process.env[API_KEY_ENV] }, io);
+        await runDeploy({ file: rest[0], values, envKey: process.env[API_KEY_ENV], toolVersion: packageJson.version }, io);
         return EXIT_OK;
       default:
         throw new CliError('USAGE', command);

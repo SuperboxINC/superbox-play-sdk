@@ -32,6 +32,10 @@ if (session.Features.Ads.Rewarded)
 
 상단 메뉴 **Superbox Play > Build & Package**를 누르면 WebGL 빌드부터 `.sbp` 패키지까지 한 번에 만들어져요. 결과는 프로젝트의 `Build/SuperboxPlay` 폴더에 생겨요.
 
+## 휴대폰에서 테스트
+
+상단 메뉴 **Superbox Play > Test on Device**를 누르면 WebGL로 빌드한 뒤 QR 창이 열려요. 같은 Wi-Fi의 휴대폰 카메라로 찍으면 바로 실행돼요. 광고와 결제는 시뮬레이션이에요.
+
 ## 동작 환경
 
 | 환경 | 동작 |

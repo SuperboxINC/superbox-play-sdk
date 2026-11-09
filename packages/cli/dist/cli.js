@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 // packages/cli/package.json
 var package_default = {
   name: "@superbox-play/cli",
-  version: "0.1.1",
+  version: "0.2.0",
   description: "\uC288\uD37C\uBC15\uC2A4 \uD50C\uB808\uC774 \uAC8C\uC784 \uD328\uD0A4\uC9C0 \uB3C4\uAD6C \u2014 superbox-play init \xB7 build \xB7 inspect \xB7 dev",
   type: "module",
   license: "SEE LICENSE IN ../../LICENSE",
@@ -21,6 +21,7 @@ var package_default = {
 
 // packages/cli/src/commands.ts
 import { stat as stat2, writeFile } from "node:fs/promises";
+import { networkInterfaces } from "node:os";
 import path6 from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -1038,6 +1039,40 @@ function injectEntry(input) {
   };
 }
 
+// packages/package-core/src/sdk-policy.ts
+var SDK_POLICY_URL = "https://raw.githubusercontent.com/SuperboxINC/superbox-play-sdk/main/sdk-policy.json";
+var SCHEMA_VERSION = 1;
+var VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
+function isVersion(value) {
+  return typeof value === "string" && VERSION.test(value);
+}
+function isText(value) {
+  return typeof value === "string";
+}
+function isLower(version, than) {
+  const parts = version.split(".").map(Number);
+  const others = than.split(".").map(Number);
+  for (let index = 0; index < parts.length; index += 1) {
+    const difference = (parts[index] ?? 0) - (others[index] ?? 0);
+    if (difference !== 0) return difference < 0;
+  }
+  return false;
+}
+function parseSdkPolicy(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const { schemaVersion, minVersion, recommendedVersion, deniedVersions } = value;
+  if (schemaVersion !== SCHEMA_VERSION || !isVersion(minVersion) || !isVersion(recommendedVersion)) return null;
+  return { minVersion, recommendedVersion, deniedVersions: Array.isArray(deniedVersions) ? deniedVersions.filter(isText) : [] };
+}
+function evaluateSdkPolicy(policy, version) {
+  const latestVersion = policy.recommendedVersion;
+  if (policy.deniedVersions.includes(version)) return { kind: "blocked", latestVersion, message: `\uC774 \uB3C4\uAD6C \uBC84\uC804(${version})\uC740 \uBB38\uC81C\uAC00 \uC788\uC5B4 \uC4F8 \uC218 \uC5C6\uC5B4\uC694. \uCD5C\uC2E0 \uBC84\uC804\uC73C\uB85C \uC5C5\uB370\uC774\uD2B8\uD574 \uC8FC\uC138\uC694.` };
+  if (!isVersion(version)) return { kind: "ok" };
+  if (isLower(version, policy.minVersion)) return { kind: "blocked", latestVersion, message: `\uC774 \uB3C4\uAD6C \uBC84\uC804(${version})\uC740 \uC9C0\uC6D0\uC774 \uB05D\uB0AC\uC5B4\uC694. ${policy.minVersion} \uC774\uC0C1\uC73C\uB85C \uC5C5\uB370\uC774\uD2B8\uD574 \uC8FC\uC138\uC694.` };
+  if (isLower(version, latestVersion)) return { kind: "update-recommended", latestVersion, message: `\uC0C8 \uBC84\uC804\uC774 \uB098\uC654\uC5B4\uC694. \uC5C5\uB370\uC774\uD2B8\uB97C \uAD8C\uD574\uC694. (\uC9C0\uAE08 ${version} \xB7 \uCD5C\uC2E0 ${latestVersion})` };
+  return { kind: "ok" };
+}
+
 // packages/package-core/src/runtime-assets.generated.ts
 var BOOT_JS = '"use strict";(()=>{function A(e){let{win:t,loading:o}=e,n=e.now(),i=!1,l=()=>{var r,g,s;return!!((s=(g=(r=t.cc)==null?void 0:r.director)==null?void 0:g.getScene)!=null&&s.call(g))},d=t.console,a=d.error;d.error=(...r)=>{let[g]=r;r.length===1&&g instanceof Error&&!l()&&o.fail(e.classify(g.message),g.message),a.apply(d,r)};let c=e.setInterval(()=>{if(o.isComplete()||!o.api.autoComplete){e.clearInterval(c);return}t.cc&&!i&&(i=!0,o.api.progress(.3));let r=e.now()-n>6e4;!l()&&!r||(e.clearInterval(c),(l()||!o.hasFailed())&&o.api.complete())},100)}var q=()=>{};function x(e,t){try{return typeof e=="string"?new URL(e,t).href:e instanceof URL?e.href:e.url}catch{return null}}function X(e,t){let o=typeof e=="object"&&"method"in e?e.method:"GET";return((t==null?void 0:t.method)??o).toUpperCase()}function Z(e){e.then(t=>{var o;return(o=t==null?void 0:t.body)==null?void 0:o.cancel()}).catch(()=>{})}function R(e,t,o){if(o||t.length===0||typeof e.fetch!="function")return q;let n=e.fetch,i=(c,r)=>n.call(e,c,r),l=new Map;for(let c of t){let r=x(c,e.location.href);r&&l.set(r,i(c).catch(()=>null))}let d=(c,r)=>{let g=x(c,e.location.href),s=g&&X(c,r)==="GET"?l.get(g):void 0;return!g||!s?i(c,r):(l.delete(g),l.size===0&&a(),s.then(m=>m&&m.ok&&!m.bodyUsed?m:i(c,r)))},a=()=>{e.fetch===d&&(e.fetch=n)};return e.fetch=d,()=>{a();for(let c of l.values())Z(c);l.clear()}}var Y=/webgl|glctx|gl context|context lost/i,Q=/^script error\\.?$|ResizeObserver loop/i,J=/\\/sdk\\/play\\/v1\\.js([?#]|$)/,ee=/dynamically imported module|importing a module script failed|loading chunk|chunkloaderror|unable to (?:load|resolve) (?:specifier|bare)/i;function _(e,t){return o=>Y.test(o)||t()?"WEBGL_CONTEXT":e.engine==="html5"?"UNKNOWN":"ENGINE_INIT"}function T(e,t){try{return new URL(e,t.location.href).origin===t.location.origin}catch{return!1}}function M(e,t,o){let{win:n,loading:i}=e,l=d=>{let a=d.src;!a||J.test(a)||!T(a,n)||i.fail("SCRIPT_LOAD",a)};n.addEventListener("error",d=>{if(i.isComplete())return;let a=d.target;if(a instanceof HTMLScriptElement){l(a);return}if(a instanceof Element)return;let{message:c,filename:r}=d;!c||Q.test(c)||r&&!T(r,n)||i.fail(t(c),c)},!0),n.addEventListener("unhandledrejection",d=>{if(i.isComplete())return;let a=d.reason,c=a instanceof Error?`${a.name}: ${a.message}`:String(a);ee.test(c)&&i.fail("SCRIPT_LOAD",c)}),n.addEventListener("webglcontextcreationerror",o,!0)}var te=["mousedown","mouseup","click"];function w(e){Object.defineProperty(e,"preventDefault",{value:()=>{},configurable:!0})}function P(e,t,o){let n=!1,i=0,l=r=>{let g=r.target;n=!t.hasFocus()&&r.cancelable&&r.touches.length===1&&(g==null?void 0:g.tagName)==="CANVAS",n&&w(r)},d=r=>{n&&(n=!1,w(r),i=o()+800)},a=()=>{n=!1},c=r=>{!r.isTrusted||o()>=i||(r.type==="mousedown"&&r.preventDefault(),r.stopImmediatePropagation())};e.addEventListener("touchstart",l,!0),e.addEventListener("touchend",d,!0),e.addEventListener("touchcancel",a,!0);for(let r of te)e.addEventListener(r,c,!0)}function oe(e){return e instanceof Error?e.message:typeof e=="string"?e:String(e)}function k(e){let t=e.appInfo,o=0,n=!1,i=e.now(),l=-1/0,d=!1,a=!1,c=null,r=[],g=[],s=[],m=[],p=(u,f)=>{try{u(f)}catch(b){e.report(b)}},E=()=>{let u=l+100-e.now();u<=0?(l=e.now(),e.post({stage:"progress",progress:o})):d||(d=!0,e.later(()=>{d=!1,a||E()},u))},h=(u,f)=>{if(!(a||c)){c={code:u,message:f.slice(0,200)},e.view.showError(c,t),e.post({stage:"error",...c});for(let b of m)p(b,c)}};return{api:{get appInfo(){return t},autoComplete:!0,onReady(u){r.push(u),p(u,t)},onProgress(u){g.push(u),n&&p(u,o)},onComplete(u){a?p(u,void 0):s.push(u)},onError(u){m.push(u),c&&p(u,c)},progress(u){if(a||typeof u!="number"||!Number.isFinite(u))return;let f=Math.min(1,Math.max(0,u)),b=!n;if(n=!0,!(f<=o&&!b)){f>o&&(i=e.now()),o=Math.max(o,f),e.view.setProgress(o),E();for(let j of g)p(j,o)}},complete(){if(!a){a=!0,o=1,n=!0,e.view.setProgress(1),e.post({stage:"ready",elapsedMs:Math.round(e.now())}),e.view.hide(),c&&e.view.hideError();for(let u of g)p(u,1);for(let u of s.splice(0))p(u,void 0)}},error(u){let f=oe(u);h(e.classify(f),f)},hide(){e.view.hide()}},fail:h,setAppInfo(u){t={...t,...u},e.view.setAppInfo(t);for(let f of r)p(f,t)},isComplete:()=>a,hasFailed:()=>c!==null,hasProgress:()=>n,lastProgress:()=>o,lastMoveAt:()=>i}}var ne=/Mali-[34]|Mali-T[0-7]|Adreno (?:\\(TM\\) )?[2-4]\\d\\d|PowerVR SGX|PowerVR Rogue G|Intel\\(R\\) HD Graphics [2-5]/i;function O(e,t){let o=t.devicePixelRatio||1;return e!=="auto"?Math.min(e,o):t.mobile?ne.test(t.renderer)||t.memoryGb!==void 0&&t.memoryGb<=2||t.cores!==void 0&&t.cores<=2?1:(t.ios?(t.cores??0)>=6:(t.memoryGb??0)>=6)?o:Math.min(o,2):null}var U="sbp.reload";function B(e){try{let t=e(),o=Number.parseInt(t.getItem(U)??"0",10),n=Number.isFinite(o)?o:2;return n>=2?!1:(t.setItem(U,String(n+1)),!0)}catch{return!1}}function re(e,t){if(t===null)return e;let o=e==null?void 0:e.devicePixelRatio;return{...e,devicePixelRatio:typeof o=="number"?Math.min(o,t):t}}function ie(e,t){let{loading:o}=t;return function(i,l,d){o.api.autoComplete=!1,o.api.progress(0);let a=null;try{a=t.pixelRatio()}catch{a=null}let c=r=>{o.api.progress(r),d==null||d(r)};return e.call(this,i,re(l,a),c).then(r=>(t.afterFrame(()=>o.api.complete()),r),r=>{let g=r instanceof Error?r.message:String(r);throw o.fail(t.classify(g),g),r})}}function F(e){let{win:t,doc:o,loading:n}=e,i=!1,l,d=()=>{o.removeEventListener("load",a,!0),e.clearInterval(l)},a=()=>{if(i)return;let r=t.createUnityInstance;typeof r=="function"&&(i=!0,t.createUnityInstance=ie(r,e),d())},c=e.now();o.addEventListener("load",a,!0),l=e.setInterval(()=>{a(),!i&&(n.isComplete()||e.now()-c>3e4)&&d()},50)}var G=\'-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Segoe UI",sans-serif\',ae="\\uAC8C\\uC784\\uC744 \\uBD88\\uB7EC\\uC624\\uC9C0 \\uBABB\\uD588\\uC5B4\\uC694",se="\\uB2E4\\uC2DC \\uC2DC\\uB3C4",le="\\uB124\\uD2B8\\uC6CC\\uD06C \\uC0C1\\uD0DC\\uB97C \\uD655\\uC778\\uD558\\uACE0 \\uB2E4\\uC2DC \\uC2DC\\uB3C4\\uD574 \\uC8FC\\uC138\\uC694.",ce="\\uB2E4\\uB978 \\uC571\\uC744 \\uB2EB\\uACE0 \\uB2E4\\uC2DC \\uC2DC\\uB3C4\\uD574 \\uC8FC\\uC138\\uC694.";function de(e){let t=Number.parseInt(e.slice(1),16);return`rgba(${t>>16&255},${t>>8&255},${t&255},.24)`}function W(e){return Array.from((e??"").trim())[0]??""}function N(e,t,o){let n=null,i,l=null,d=-1,a=s=>(n==null?void 0:n.querySelector(s))??null,c=s=>{let m=()=>s.remove();s.addEventListener("error",m),s.complete&&s.naturalWidth===0&&s.getAttribute("src")&&m()},r=()=>{let s=a(".sbp-tip");if(!s||t.tips.length<2)return;let m=0;i=setInterval(()=>{m=(m+1)%t.tips.length,s.style.opacity="0",setTimeout(()=>{s.textContent=t.tips[m]??"",s.style.opacity=""},200)},4e3)},g=s=>{let m=a(".sbp-bar");if(!m)return;m.setAttribute("data-on",""),m.setAttribute("aria-valuenow",String(Math.round(s*100)));let p=m.firstElementChild;p&&(p.style.transform=`scaleX(${s})`)};return{attach(){if(n=e.getElementById("sbp-loading"),!n)return;let s=a(".sbp-icon img");s&&c(s),r(),d>=0&&g(d)},setProgress(s){d=s,g(s)},setAppInfo(s){var h;if(!n||n.getAttribute("data-mode")==="custom")return;n.style.setProperty("--sbp-bg",s.backgroundColor),n.style.setProperty("--sbp-primary",s.primaryColor),n.style.setProperty("--sbp-glow",de(s.primaryColor));let m=a(".sbp-name");m&&(m.textContent=s.title??"");let p=a(".sbp-icon span");p&&(p.textContent=W(s.title));let E=a(".sbp-icon");if(E&&(E.hidden=!s.iconUrl&&!W(s.title),s.iconUrl&&!t.iconUrl)){(h=a(".sbp-icon img"))==null||h.remove();let y=e.createElement("img");y.alt="",y.src=s.iconUrl,E.appendChild(y),c(y)}},hide(){i!==void 0&&clearInterval(i);let s=n??e.getElementById("sbp-loading");s&&(n=null,s.style.opacity="0",s.style.pointerEvents="none",setTimeout(()=>s.remove(),360))},showError(s,m){if(l)return;let p=e.createElement("div");p.id="sbp-error",p.setAttribute("role","alert"),p.style.cssText=`position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:${m.backgroundColor};color:#f2f4f6;font:400 14px/1.5 ${G};text-align:center;word-break:keep-all`;let E=e.createElement("p");E.textContent=ae,E.style.cssText="margin:0;font-size:17px;font-weight:600;line-height:26px";let h=e.createElement("p");h.textContent=s.code==="WEBGL_CONTEXT"?ce:le,h.style.cssText="margin:6px 0 0;color:rgba(255,255,255,.62);font-size:13px";let y=e.createElement("button");y.type="button",y.textContent=se,y.style.cssText=`margin-top:22px;min-width:132px;min-height:44px;padding:0 24px;border:0;border-radius:12px;background:${m.primaryColor};color:#fff;font:600 15px/1 ${G};cursor:pointer`,y.addEventListener("click",o),p.append(E,h,y),(e.body??e.documentElement).appendChild(p),l=p},hideError(){l==null||l.remove(),l=null}}}function D(e){let t=e.now(),o=e.resourceCount(),n=e.setInterval(()=>{let{loading:i}=e;if(i.isComplete()||i.hasFailed()){e.clearInterval(n);return}let l=e.resourceCount();(l!==o||e.isHidden())&&(o=l,t=e.now()),!(!i.hasProgress()||i.lastProgress()>=.9)&&(e.now()-Math.max(t,i.lastMoveAt())<6e4||(e.clearInterval(n),e.reload()||i.fail("WATCHDOG","loading stalled")))},1e4)}var ue=["www","api","cdn","console","games","static","admin","assets","play","sdk","test","developers","docs","mail","play-api","console-api","admin-api"],fe=/^[a-z0-9-]+$/,pe=/^[\\d.]+$/;function I(e,t){let o,n;try{o=new URL(e),n=new URL(t)}catch{return!1}if(o.origin!==e||o.protocol!==n.protocol||o.port!==n.port)return!1;let i=o.hostname,l=n.hostname;if(i===l)return!0;let d=l.split("."),a=l==="localhost"?l:d.length>2&&!pe.test(l)?d.slice(1).join("."):"";if(!a||!i.endsWith(`.${a}`))return!1;let c=i.slice(0,-a.length-1);return fe.test(c)&&!ue.includes(c)}function H(e,t){if(!e)return"*";let o=e[0];return o!==void 0&&I(o,t)?o:null}function V(e,t){return t!=="*"||!("message"in e)?e:Object.fromEntries(Object.entries(e).filter(([o])=>o!=="message"))}var ge=120,$=/^#[0-9A-Fa-f]{6}$/,me=/iPhone|iPad|iPod/i,K=/Android/i;function L(e){try{e()}catch{}}function v(e,t){let o=!1,n=()=>{o||(o=!0,t())};L(()=>e.requestAnimationFrame(()=>e.requestAnimationFrame(n))),e.setTimeout(n,ge)}function z(e,t){try{return e.performance.getEntriesByType(t)}catch{return[]}}function ye(e){var t;return((t=z(e,"navigation")[0])==null?void 0:t.type)==="reload"}function Ee(e){var t;try{let o=e.createElement("canvas").getContext("webgl");if(!o)return"";let n=o.getExtension("WEBGL_debug_renderer_info"),i=n?String(o.getParameter(n.UNMASKED_RENDERER_WEBGL)):"";return(t=o.getExtension("WEBGL_lose_context"))==null||t.loseContext(),i}catch{return""}}function Le(e,t){let o=e.navigator.userAgent,n=me.test(o),i=n||K.test(o),l=e.navigator;return O(t.maxDevicePixelRatio,{devicePixelRatio:e.devicePixelRatio,mobile:i,ios:n,memoryGb:l.deviceMemory,cores:l.hardwareConcurrency,renderer:i&&t.maxDevicePixelRatio==="auto"?Ee(e.document):""})}function he(e){if(typeof e!="object"||e===null)return null;let t=e;if(t.type!=="sbx.appInfo"||t.v!==1)return null;let o={};return typeof t.title=="string"&&t.title.length<=100&&(o.title=t.title),typeof t.iconUrl=="string"&&/^https?:\\/\\//.test(t.iconUrl)&&(o.iconUrl=t.iconUrl),typeof t.primaryColor=="string"&&$.test(t.primaryColor)&&(o.primaryColor=t.primaryColor),typeof t.backgroundColor=="string"&&$.test(t.backgroundColor)&&(o.backgroundColor=t.backgroundColor),o}function be(e,t,o){e.addEventListener("message",n=>{if(n.source!==e.parent||!I(n.origin,t.zoneOrigin))return;let i=he(n.data);i&&o.setAppInfo(i)})}function Ce(e,t){let{config:o}=t,n=e.document,i=e.parent!==e?H(e.location.ancestorOrigins,o.zoneOrigin):null,l=()=>e.performance.now(),d=!1,a=f=>{i!==null&&L(()=>e.parent.postMessage({type:"sbx.loading",v:1,...V(f,i)},i))},c=!1,r=[],g=f=>{c?a(f):r.push(f)},s=_(o,()=>d),m=N(n,o,()=>e.location.reload()),p=k({appInfo:{title:o.title,iconUrl:o.iconUrl,primaryColor:o.primaryColor,backgroundColor:o.backgroundColor},view:m,post:g,now:l,later:(f,b)=>e.setTimeout(f,b),report:f=>L(()=>console.error(f)),classify:s});e.SBPlayLoading=p.api;let E=!1,h=()=>{E||(E=!0,L(()=>m.attach()),v(e,()=>{a({stage:"shell"}),c=!0;for(let f of r.splice(0))a(f)}))};t.shell=h,n.addEventListener("DOMContentLoaded",h);let y;Object.defineProperty(t,"pixelRatio",{configurable:!0,get(){return y??(y=Le(e,o)),y}}),L(()=>M({win:e,config:o,loading:p},s,()=>{d=!0})),L(()=>{let f=R(e,o.earlyFetch,ye(e));p.api.onComplete(f)}),L(()=>{let f=e.navigator.audioSession;f&&(f.type="ambient")}),L(()=>{K.test(e.navigator.userAgent)&&P(e,n,l)}),i!==null&&L(()=>be(e,o,p));let u={setInterval:(f,b)=>e.setInterval(f,b),clearInterval:f=>e.clearInterval(f)};o.watchdog&&L(()=>D({loading:p,now:l,isHidden:()=>n.hidden,resourceCount:()=>z(e,"resource").length,reload:()=>B(()=>e.sessionStorage)?(e.location.reload(),!0):!1,...u})),o.engine==="unity"&&L(()=>F({win:e,doc:n,loading:p,now:l,classify:s,pixelRatio:()=>t.pixelRatio??null,afterFrame:f=>v(e,f),...u})),o.engine==="cocos"&&L(()=>A({win:e,loading:p,now:l,classify:s,...u})),e.addEventListener("load",()=>{o.engine!=="cocos"&&v(e,()=>{p.api.autoComplete&&!p.hasFailed()&&p.api.complete()})})}var S=window,C=S.SBPlayBoot;C!=null&&C.config&&!S.SBPlayLoading&&L(()=>Ce(S,C));})();';
 var LOADING_TEMPLATE = '<div id="sbp-loading" data-mode="%%MODE%%" style="%%VARS%%"><style>#sbp-loading{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(72vmax 46vmax at 50% 38%,var(--sbp-glow),transparent 70%),var(--sbp-bg);color:#f2f4f6;font:400 13px/1.5 -apple-system,BlinkMacSystemFont,Apple SD Gothic Neo,Noto Sans KR,Segoe UI,sans-serif;text-align:center;-webkit-user-select:none;user-select:none;transition:opacity .3s cubic-bezier(.16,1,.3,1)}#sbp-loading *{box-sizing:border-box;margin:0;padding:0}#sbp-loading .sbp-col{display:flex;flex-direction:column;align-items:center;margin-top:-5vh;animation:sbp-in .5s cubic-bezier(.16,1,.3,1) both}#sbp-loading .sbp-icon{position:relative;display:flex;align-items:center;justify-content:center;width:72px;height:72px;overflow:hidden;border-radius:18px;background:linear-gradient(150deg,var(--sbp-primary),var(--sbp-bg) 150%);box-shadow:0 12px 32px #00000073,inset 0 0 0 1px #ffffff1a;font-size:30px;font-weight:700}#sbp-loading .sbp-icon[hidden]{display:none}#sbp-loading .sbp-icon img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}#sbp-loading .sbp-name{min-height:26px;max-width:76vw;margin-top:18px;overflow:hidden;font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:26px;text-overflow:ellipsis;white-space:nowrap}#sbp-loading .sbp-bar{position:relative;width:min(200px,52vw);height:3px;margin-top:18px;overflow:hidden;border-radius:2px;background:#ffffff1f}#sbp-loading .sbp-bar i{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:2px;background:var(--sbp-primary);box-shadow:0 0 12px var(--sbp-primary);transform:scaleX(0);transform-origin:left center;transition:transform .2s linear}#sbp-loading .sbp-bar:not([data-on]) i{width:34%;transform:translate(-100%);animation:sbp-idle 1.5s ease-in-out infinite}#sbp-loading .sbp-tip{position:absolute;right:24px;bottom:calc(env(safe-area-inset-bottom,0px) + 44px);left:24px;color:#fff9;word-break:keep-all;transition:opacity .2s}@keyframes sbp-idle{to{transform:translate(300%)}}@keyframes sbp-in{0%{opacity:0;transform:translateY(8px)}}@media(prefers-reduced-motion:reduce){#sbp-loading,#sbp-loading *{animation:none!important;transition:none!important}#sbp-loading .sbp-bar:not([data-on]) i{width:100%;opacity:.35;transform:none}}</style><div class="sbp-col"><div class="sbp-icon"%%ICONATTR%%><span>%%LETTER%%</span>%%ICON%%</div><p class="sbp-name">%%TITLE%%</p><div class="sbp-bar" role="progressbar" aria-label="\uAC8C\uC784 \uBD88\uB7EC\uC624\uB294 \uC911" aria-valuemin="0" aria-valuemax="100"><i></i></div></div><p class="sbp-tip">%%TIP%%</p></div>';
@@ -1108,7 +1143,7 @@ import path2 from "node:path";
 import { open as open2, readFile } from "node:fs/promises";
 import { brotliDecompress, constants, gunzip } from "node:zlib";
 var DATA_FILE = /(^|\/)[^/]+\.data(\.(br|gz|unityweb))?$/;
-var VERSION = /\b(?:20\d\d|[6-9]\d{3})\.\d+\.\d+[abfp]\d+\b/;
+var VERSION2 = /\b(?:20\d\d|[6-9]\d{3})\.\d+\.\d+[abfp]\d+\b/;
 var HEAD_BYTES = 256 * 1024;
 function decompressHead(bytes, encoding) {
   return new Promise((resolve) => {
@@ -1134,7 +1169,7 @@ async function versionFromBuildInfo(files) {
   try {
     const parsed = JSON.parse(await readFile(info.absolute, "utf8"));
     const version = parsed.unityVersion;
-    return typeof version === "string" && VERSION.test(version) ? version : null;
+    return typeof version === "string" && VERSION2.test(version) ? version : null;
   } catch {
     return null;
   }
@@ -1148,7 +1183,7 @@ async function readUnityVersion(files) {
     const head = await readHead(data.absolute);
     const encoding = detectEncoding(data.path, head.subarray(0, ENCODING_HEAD_BYTES));
     const text = encoding ? await decompressHead(head, encoding) : Buffer.from(head);
-    return VERSION.exec(text.toString("latin1"))?.[0] ?? null;
+    return VERSION2.exec(text.toString("latin1"))?.[0] ?? null;
   } catch {
     return null;
   }
@@ -1477,6 +1512,53 @@ async function createPackage(options) {
   }
 }
 
+// packages/package-core/src/node/sdk-policy-check.ts
+import { get as httpGet } from "node:http";
+import { get as httpsGet } from "node:https";
+var SDK_POLICY_URL_ENV = "SUPERBOX_PLAY_POLICY_URL";
+var POLICY_OFF = "off";
+var DEFAULT_TIMEOUT_MS = 2e3;
+var MAX_POLICY_CHARS = 16 * 1024;
+var OK = { kind: "ok" };
+function readJson(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const get = url.startsWith("http:") ? httpGet : httpsGet;
+    const request = get(url, (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`status ${response.statusCode}`));
+        return;
+      }
+      let text = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        text += chunk;
+        if (text.length > MAX_POLICY_CHARS) request.destroy(new Error("too large"));
+      });
+      response.on("end", () => {
+        try {
+          resolve(JSON.parse(text));
+        } catch (error) {
+          reject(error);
+        }
+      });
+      response.on("error", reject);
+    });
+    const deadline = setTimeout(() => {
+      reject(new Error("timeout"));
+      request.destroy();
+    }, timeoutMs);
+    request.on("close", () => clearTimeout(deadline));
+    request.on("error", reject);
+  });
+}
+async function checkSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const configured = process.env[SDK_POLICY_URL_ENV];
+  if (configured === POLICY_OFF) return OK;
+  const policy = await readJson(configured || SDK_POLICY_URL, timeoutMs).then(parseSdkPolicy, () => null);
+  return policy ? evaluateSdkPolicy(policy, version) : OK;
+}
+
 // packages/package-core/src/node/verify.ts
 import { createHash as createHash2 } from "node:crypto";
 var CHUNK_BYTES = 4 * 1024 * 1024;
@@ -1522,6 +1604,7 @@ var EXIT_INTERNAL = 70;
 var MAX_DETAIL_LENGTH = 200;
 var CLI_ERRORS = {
   USAGE: { message: "\uBA85\uB839\uC774\uB098 \uC635\uC158\uC774 \uD2C0\uB838\uC5B4\uC694. superbox-play --help\uB85C \uC0AC\uC6A9\uBC95\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.", exit: EXIT_USAGE },
+  SDK_VERSION_BLOCKED: { message: "\uB3C4\uAD6C\uB97C \uC5C5\uB370\uC774\uD2B8\uD574\uC57C \uD574\uC694.", exit: EXIT_FAILED },
   CONFIG_EXISTS: { message: "\uC124\uC815 \uD30C\uC77C\uC774 \uC774\uBBF8 \uC788\uC5B4\uC694. \uB36E\uC5B4\uC4F0\uB824\uBA74 --force\uB97C \uBD99\uC5EC \uC8FC\uC138\uC694.", exit: EXIT_CONFIG },
   CONFIG_NOT_FOUND: { message: "--config\uB85C \uC9C0\uC815\uD55C \uC124\uC815 \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.", exit: EXIT_CONFIG },
   FILE_NOT_FOUND: { message: "\uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.", exit: EXIT_INPUT },
@@ -1990,14 +2073,19 @@ async function deployPackage(options) {
 
 // packages/cli/src/dev-server.ts
 import { createReadStream as createReadStream4 } from "node:fs";
-import { lstat as lstat2, open as open5, readFile as readFile4 } from "node:fs/promises";
+import { lstat as lstat2, open as open5, readFile as readFile4, realpath } from "node:fs/promises";
 import { createServer } from "node:http";
 import path5 from "node:path";
+import { promisify } from "node:util";
+import { brotliDecompress as brotliDecompress2, gunzip as gunzip2 } from "node:zlib";
 var DEFAULT_DEV_PORT = 8300;
 var PORT_TRIES = 11;
 var SDK_ROUTE = "/sdk/play/v1.js";
 var ENTRY_ROUTE = "/index.html";
 var VALID_HOST_HEADER = /^[A-Za-z0-9.:[\]-]+$/;
+var LOOPBACK_HOSTS = /* @__PURE__ */ new Set(["127.0.0.1", "localhost", "::1"]);
+var DECODERS = { br: promisify(brotliDecompress2), gzip: promisify(gunzip2) };
+var MAX_DECODED_BYTES = 1024 * 1024 * 1024;
 function send(response, status, type, body, head) {
   response.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store" });
   response.end(head ? void 0 : body);
@@ -2026,9 +2114,25 @@ function originOf(request, fallback) {
 function preparedBytes(file) {
   return file?.source.kind === "bytes" ? file.source.bytes : null;
 }
+function isHidden(relative) {
+  return relative.split("/").some((segment) => segment.startsWith("."));
+}
 async function startDevServer(options) {
   const root = path5.resolve(options.folder);
+  const servesOtherDevices = !LOOPBACK_HOSTS.has(options.host);
+  const decodedFiles = /* @__PURE__ */ new Map();
   let ownOrigin = "";
+  const isInsideRoot = (absolute) => Promise.all([realpath(root), realpath(path5.dirname(absolute))]).then(
+    ([realRoot, realParent]) => realParent === realRoot || realParent.startsWith(realRoot + path5.sep),
+    () => false
+  );
+  const decodedBytes = (absolute, encoding, info) => {
+    const known = decodedFiles.get(absolute);
+    if (known && known.mtimeMs === info.mtimeMs && known.size === info.size) return known.bytes;
+    const bytes = readFile4(absolute).then((source) => DECODERS[encoding](source, { maxOutputLength: MAX_DECODED_BYTES })).catch(() => null);
+    decodedFiles.set(absolute, { mtimeMs: info.mtimeMs, size: info.size, bytes });
+    return bytes;
+  };
   const serveStatic = async (relative, response, head) => {
     const absolute = path5.resolve(root, relative);
     if (!absolute.startsWith(root + path5.sep)) {
@@ -2036,11 +2140,19 @@ async function startDevServer(options) {
       return;
     }
     const info = await lstat2(absolute).catch(() => null);
-    if (!info?.isFile()) {
+    if (!info?.isFile() || !await isInsideRoot(absolute)) {
       send(response, 404, "text/plain; charset=utf-8", "not found", head);
       return;
     }
     const encoding = detectEncoding(relative, await fileHead(absolute));
+    if (encoding && servesOtherDevices) {
+      const decoded = await decodedBytes(absolute, encoding, info);
+      if (decoded) {
+        response.writeHead(200, { "Content-Type": contentTypeFor(relative, encoding), "Cache-Control": "no-store", "Content-Length": decoded.length });
+        response.end(head ? void 0 : decoded);
+        return;
+      }
+    }
     response.writeHead(200, {
       "Content-Type": contentTypeFor(relative, encoding),
       "Cache-Control": "no-store",
@@ -2051,7 +2163,7 @@ async function startDevServer(options) {
       response.end();
       return;
     }
-    createReadStream4(absolute).pipe(response);
+    createReadStream4(absolute).on("error", () => response.destroy()).pipe(response);
   };
   const prepare = async (request) => {
     const { config, configDir } = await options.loadConfig();
@@ -2093,7 +2205,7 @@ async function startDevServer(options) {
     }
     const route = pathname === "/" ? ENTRY_ROUTE : pathname;
     const relative = route.slice(1);
-    if (!isSafeBuildPath(relative)) {
+    if (!isSafeBuildPath(relative) || servesOtherDevices && isHidden(relative)) {
       send(response, 404, "text/plain; charset=utf-8", "not found", head);
       return;
     }
@@ -2151,8 +2263,730 @@ async function startDevServer(options) {
   };
 }
 
+// node_modules/uqr/dist/index.mjs
+var QrCodeDataType = /* @__PURE__ */ ((QrCodeDataType2) => {
+  QrCodeDataType2[QrCodeDataType2["Border"] = -1] = "Border";
+  QrCodeDataType2[QrCodeDataType2["Data"] = 0] = "Data";
+  QrCodeDataType2[QrCodeDataType2["Function"] = 1] = "Function";
+  QrCodeDataType2[QrCodeDataType2["Position"] = 2] = "Position";
+  QrCodeDataType2[QrCodeDataType2["Timing"] = 3] = "Timing";
+  QrCodeDataType2[QrCodeDataType2["Alignment"] = 4] = "Alignment";
+  return QrCodeDataType2;
+})(QrCodeDataType || {});
+var LOW = [0, 1];
+var MEDIUM = [1, 0];
+var QUARTILE = [2, 3];
+var HIGH = [3, 2];
+var EccMap = {
+  L: LOW,
+  M: MEDIUM,
+  Q: QUARTILE,
+  H: HIGH
+};
+var NUMERIC_REGEX = /^\d*$/;
+var ALPHANUMERIC_REGEX = /^[A-Z0-9 $%*+./:-]*$/;
+var ALPHANUMERIC_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+var MIN_VERSION = 1;
+var MAX_VERSION = 40;
+var PENALTY_N1 = 3;
+var PENALTY_N2 = 3;
+var PENALTY_N3 = 40;
+var PENALTY_N4 = 10;
+var ECC_CODEWORDS_PER_BLOCK = [
+  // Version: (note that index 0 is for padding, and is set to an illegal value)
+  // 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40    Error correction level
+  [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+  // Low
+  [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+  // Medium
+  [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+  // Quartile
+  [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
+  // High
+];
+var NUM_ERROR_CORRECTION_BLOCKS = [
+  // Version: (note that index 0 is for padding, and is set to an illegal value)
+  // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40    Error correction level
+  [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+  // Low
+  [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+  // Medium
+  [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+  // Quartile
+  [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81]
+  // High
+];
+var QrCode = class {
+  /* -- Constructor (low level) and fields -- */
+  // Creates a new QR Code with the given version number,
+  // error correction level, data codeword bytes, and mask number.
+  // This is a low-level API that most users should not use directly.
+  // A mid-level API is the encodeSegments() function.
+  constructor(version, ecc, dataCodewords, msk) {
+    this.version = version;
+    this.ecc = ecc;
+    if (version < MIN_VERSION || version > MAX_VERSION)
+      throw new RangeError("Version value out of range");
+    if (msk < -1 || msk > 7)
+      throw new RangeError("Mask value out of range");
+    this.size = version * 4 + 17;
+    const row = Array.from({ length: this.size }).fill(false);
+    for (let i = 0; i < this.size; i++) {
+      this.modules.push(row.slice());
+      this.types.push(row.map(() => 0));
+    }
+    this.drawFunctionPatterns();
+    const allCodewords = this.addEccAndInterleave(dataCodewords);
+    this.drawCodewords(allCodewords);
+    if (msk === -1) {
+      let minPenalty = 1e9;
+      for (let i = 0; i < 8; i++) {
+        this.applyMask(i);
+        this.drawFormatBits(i);
+        const penalty = this.getPenaltyScore();
+        if (penalty < minPenalty) {
+          msk = i;
+          minPenalty = penalty;
+        }
+        this.applyMask(i);
+      }
+    }
+    this.mask = msk;
+    this.applyMask(msk);
+    this.drawFormatBits(msk);
+  }
+  /* -- Fields -- */
+  // The width and height of this QR Code, measured in modules, between
+  // 21 and 177 (inclusive). This is equal to version * 4 + 17.
+  size;
+  // The index of the mask pattern used in this QR Code, which is between 0 and 7 (inclusive).
+  // Even if a QR Code is created with automatic masking requested (mask = -1),
+  // the resulting object still has a mask value between 0 and 7.
+  mask;
+  // The modules of this QR Code (false = light, true = dark).
+  // Immutable after constructor finishes. Accessed through getModule().
+  modules = [];
+  types = [];
+  /* -- Accessor methods -- */
+  // Returns the color of the module (pixel) at the given coordinates, which is false
+  // for light or true for dark. The top left corner has the coordinates (x=0, y=0).
+  // If the given coordinates are out of bounds, then false (light) is returned.
+  getModule(x, y) {
+    return x >= 0 && x < this.size && y >= 0 && y < this.size && this.modules[y][x];
+  }
+  /* -- Private helper methods for constructor: Drawing function modules -- */
+  // Reads this object's version field, and draws and marks all function modules.
+  drawFunctionPatterns() {
+    for (let i = 0; i < this.size; i++) {
+      this.setFunctionModule(6, i, i % 2 === 0, QrCodeDataType.Timing);
+      this.setFunctionModule(i, 6, i % 2 === 0, QrCodeDataType.Timing);
+    }
+    this.drawFinderPattern(3, 3);
+    this.drawFinderPattern(this.size - 4, 3);
+    this.drawFinderPattern(3, this.size - 4);
+    const alignPatPos = this.getAlignmentPatternPositions();
+    const numAlign = alignPatPos.length;
+    for (let i = 0; i < numAlign; i++) {
+      for (let j = 0; j < numAlign; j++) {
+        if (!(i === 0 && j === 0 || i === 0 && j === numAlign - 1 || i === numAlign - 1 && j === 0))
+          this.drawAlignmentPattern(alignPatPos[i], alignPatPos[j]);
+      }
+    }
+    this.drawFormatBits(0);
+    this.drawVersion();
+  }
+  // Draws two copies of the format bits (with its own error correction code)
+  // based on the given mask and this object's error correction level field.
+  drawFormatBits(mask) {
+    const data = this.ecc[1] << 3 | mask;
+    let rem = data;
+    for (let i = 0; i < 10; i++)
+      rem = rem << 1 ^ (rem >>> 9) * 1335;
+    const bits = (data << 10 | rem) ^ 21522;
+    for (let i = 0; i <= 5; i++)
+      this.setFunctionModule(8, i, getBit(bits, i));
+    this.setFunctionModule(8, 7, getBit(bits, 6));
+    this.setFunctionModule(8, 8, getBit(bits, 7));
+    this.setFunctionModule(7, 8, getBit(bits, 8));
+    for (let i = 9; i < 15; i++)
+      this.setFunctionModule(14 - i, 8, getBit(bits, i));
+    for (let i = 0; i < 8; i++)
+      this.setFunctionModule(this.size - 1 - i, 8, getBit(bits, i));
+    for (let i = 8; i < 15; i++)
+      this.setFunctionModule(8, this.size - 15 + i, getBit(bits, i));
+    this.setFunctionModule(8, this.size - 8, true);
+  }
+  // Draws two copies of the version bits (with its own error correction code),
+  // based on this object's version field, iff 7 <= version <= 40.
+  drawVersion() {
+    if (this.version < 7)
+      return;
+    let rem = this.version;
+    for (let i = 0; i < 12; i++)
+      rem = rem << 1 ^ (rem >>> 11) * 7973;
+    const bits = this.version << 12 | rem;
+    for (let i = 0; i < 18; i++) {
+      const color = getBit(bits, i);
+      const a = this.size - 11 + i % 3;
+      const b = Math.floor(i / 3);
+      this.setFunctionModule(a, b, color);
+      this.setFunctionModule(b, a, color);
+    }
+  }
+  // Draws a 9*9 finder pattern including the border separator,
+  // with the center module at (x, y). Modules can be out of bounds.
+  drawFinderPattern(x, y) {
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        const dist = Math.max(Math.abs(dx), Math.abs(dy));
+        const xx = x + dx;
+        const yy = y + dy;
+        if (xx >= 0 && xx < this.size && yy >= 0 && yy < this.size)
+          this.setFunctionModule(xx, yy, dist !== 2 && dist !== 4, QrCodeDataType.Position);
+      }
+    }
+  }
+  // Draws a 5*5 alignment pattern, with the center module
+  // at (x, y). All modules must be in bounds.
+  drawAlignmentPattern(x, y) {
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        this.setFunctionModule(
+          x + dx,
+          y + dy,
+          Math.max(Math.abs(dx), Math.abs(dy)) !== 1,
+          QrCodeDataType.Alignment
+        );
+      }
+    }
+  }
+  // Sets the color of a module and marks it as a function module.
+  // Only used by the constructor. Coordinates must be in bounds.
+  setFunctionModule(x, y, isDark, type = QrCodeDataType.Function) {
+    this.modules[y][x] = isDark;
+    this.types[y][x] = type;
+  }
+  /* -- Private helper methods for constructor: Codewords and masking -- */
+  // Returns a new byte string representing the given data with the appropriate error correction
+  // codewords appended to it, based on this object's version and error correction level.
+  addEccAndInterleave(data) {
+    const ver = this.version;
+    const ecl = this.ecc;
+    if (data.length !== getNumDataCodewords(ver, ecl))
+      throw new RangeError("Invalid argument");
+    const numBlocks = NUM_ERROR_CORRECTION_BLOCKS[ecl[0]][ver];
+    const blockEccLen = ECC_CODEWORDS_PER_BLOCK[ecl[0]][ver];
+    const rawCodewords = Math.floor(getNumRawDataModules(ver) / 8);
+    const numShortBlocks = numBlocks - rawCodewords % numBlocks;
+    const shortBlockLen = Math.floor(rawCodewords / numBlocks);
+    const blocks = [];
+    const rsDiv = reedSolomonComputeDivisor(blockEccLen);
+    for (let i = 0, k = 0; i < numBlocks; i++) {
+      const dat = data.slice(k, k + shortBlockLen - blockEccLen + (i < numShortBlocks ? 0 : 1));
+      k += dat.length;
+      const ecc = reedSolomonComputeRemainder(dat, rsDiv);
+      if (i < numShortBlocks)
+        dat.push(0);
+      blocks.push(dat.concat(ecc));
+    }
+    const result = [];
+    for (let i = 0; i < blocks[0].length; i++) {
+      blocks.forEach((block, j) => {
+        if (i !== shortBlockLen - blockEccLen || j >= numShortBlocks)
+          result.push(block[i]);
+      });
+    }
+    return result;
+  }
+  // Draws the given sequence of 8-bit codewords (data and error correction) onto the entire
+  // data area of this QR Code. Function modules need to be marked off before this is called.
+  drawCodewords(data) {
+    if (data.length !== Math.floor(getNumRawDataModules(this.version) / 8))
+      throw new RangeError("Invalid argument");
+    let i = 0;
+    for (let right = this.size - 1; right >= 1; right -= 2) {
+      if (right === 6)
+        right = 5;
+      for (let vert = 0; vert < this.size; vert++) {
+        for (let j = 0; j < 2; j++) {
+          const x = right - j;
+          const upward = (right + 1 & 2) === 0;
+          const y = upward ? this.size - 1 - vert : vert;
+          if (!this.types[y][x] && i < data.length * 8) {
+            this.modules[y][x] = getBit(data[i >>> 3], 7 - (i & 7));
+            i++;
+          }
+        }
+      }
+    }
+  }
+  // XORs the codeword modules in this QR Code with the given mask pattern.
+  // The function modules must be marked and the codeword bits must be drawn
+  // before masking. Due to the arithmetic of XOR, calling applyMask() with
+  // the same mask value a second time will undo the mask. A final well-formed
+  // QR Code needs exactly one (not zero, two, etc.) mask applied.
+  applyMask(mask) {
+    if (mask < 0 || mask > 7)
+      throw new RangeError("Mask value out of range");
+    for (let y = 0; y < this.size; y++) {
+      for (let x = 0; x < this.size; x++) {
+        let invert;
+        switch (mask) {
+          case 0:
+            invert = (x + y) % 2 === 0;
+            break;
+          case 1:
+            invert = y % 2 === 0;
+            break;
+          case 2:
+            invert = x % 3 === 0;
+            break;
+          case 3:
+            invert = (x + y) % 3 === 0;
+            break;
+          case 4:
+            invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0;
+            break;
+          case 5:
+            invert = x * y % 2 + x * y % 3 === 0;
+            break;
+          case 6:
+            invert = (x * y % 2 + x * y % 3) % 2 === 0;
+            break;
+          case 7:
+            invert = ((x + y) % 2 + x * y % 3) % 2 === 0;
+            break;
+          default:
+            throw new Error("Unreachable");
+        }
+        if (!this.types[y][x] && invert)
+          this.modules[y][x] = !this.modules[y][x];
+      }
+    }
+  }
+  // Calculates and returns the penalty score based on state of this QR Code's current modules.
+  // This is used by the automatic mask choice algorithm to find the mask pattern that yields the lowest score.
+  getPenaltyScore() {
+    let result = 0;
+    for (let y = 0; y < this.size; y++) {
+      let runColor = false;
+      let runX = 0;
+      const runHistory = [0, 0, 0, 0, 0, 0, 0];
+      for (let x = 0; x < this.size; x++) {
+        if (this.modules[y][x] === runColor) {
+          runX++;
+          if (runX === 5)
+            result += PENALTY_N1;
+          else if (runX > 5)
+            result++;
+        } else {
+          this.finderPenaltyAddHistory(runX, runHistory);
+          if (!runColor)
+            result += this.finderPenaltyCountPatterns(runHistory) * PENALTY_N3;
+          runColor = this.modules[y][x];
+          runX = 1;
+        }
+      }
+      result += this.finderPenaltyTerminateAndCount(runColor, runX, runHistory) * PENALTY_N3;
+    }
+    for (let x = 0; x < this.size; x++) {
+      let runColor = false;
+      let runY = 0;
+      const runHistory = [0, 0, 0, 0, 0, 0, 0];
+      for (let y = 0; y < this.size; y++) {
+        if (this.modules[y][x] === runColor) {
+          runY++;
+          if (runY === 5)
+            result += PENALTY_N1;
+          else if (runY > 5)
+            result++;
+        } else {
+          this.finderPenaltyAddHistory(runY, runHistory);
+          if (!runColor)
+            result += this.finderPenaltyCountPatterns(runHistory) * PENALTY_N3;
+          runColor = this.modules[y][x];
+          runY = 1;
+        }
+      }
+      result += this.finderPenaltyTerminateAndCount(runColor, runY, runHistory) * PENALTY_N3;
+    }
+    for (let y = 0; y < this.size - 1; y++) {
+      for (let x = 0; x < this.size - 1; x++) {
+        const color = this.modules[y][x];
+        if (color === this.modules[y][x + 1] && color === this.modules[y + 1][x] && color === this.modules[y + 1][x + 1]) {
+          result += PENALTY_N2;
+        }
+      }
+    }
+    let dark = 0;
+    for (const row of this.modules)
+      dark = row.reduce((sum, color) => sum + (color ? 1 : 0), dark);
+    const total = this.size * this.size;
+    const k = Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1;
+    result += k * PENALTY_N4;
+    return result;
+  }
+  /* -- Private helper functions -- */
+  // Returns an ascending list of positions of alignment patterns for this version number.
+  // Each position is in the range [0,177), and are used on both the x and y axes.
+  // This could be implemented as lookup table of 40 variable-length lists of integers.
+  getAlignmentPatternPositions() {
+    if (this.version === 1) {
+      return [];
+    } else {
+      const numAlign = Math.floor(this.version / 7) + 2;
+      const step = this.version === 32 ? 26 : Math.ceil((this.version * 4 + 4) / (numAlign * 2 - 2)) * 2;
+      const result = [6];
+      for (let pos = this.size - 7; result.length < numAlign; pos -= step)
+        result.splice(1, 0, pos);
+      return result;
+    }
+  }
+  // Can only be called immediately after a light run is added, and
+  // returns either 0, 1, or 2. A helper function for getPenaltyScore().
+  finderPenaltyCountPatterns(runHistory) {
+    const n = runHistory[1];
+    const core = n > 0 && runHistory[2] === n && runHistory[3] === n * 3 && runHistory[4] === n && runHistory[5] === n;
+    return (core && runHistory[0] >= n * 4 && runHistory[6] >= n ? 1 : 0) + (core && runHistory[6] >= n * 4 && runHistory[0] >= n ? 1 : 0);
+  }
+  // Must be called at the end of a line (row or column) of modules. A helper function for getPenaltyScore().
+  finderPenaltyTerminateAndCount(currentRunColor, currentRunLength, runHistory) {
+    if (currentRunColor) {
+      this.finderPenaltyAddHistory(currentRunLength, runHistory);
+      currentRunLength = 0;
+    }
+    currentRunLength += this.size;
+    this.finderPenaltyAddHistory(currentRunLength, runHistory);
+    return this.finderPenaltyCountPatterns(runHistory);
+  }
+  // Pushes the given value to the front and drops the last value. A helper function for getPenaltyScore().
+  finderPenaltyAddHistory(currentRunLength, runHistory) {
+    if (runHistory[0] === 0)
+      currentRunLength += this.size;
+    runHistory.pop();
+    runHistory.unshift(currentRunLength);
+  }
+};
+function appendBits(val, len, bb) {
+  if (len < 0 || len > 31 || val >>> len !== 0)
+    throw new RangeError("Value out of range");
+  for (let i = len - 1; i >= 0; i--)
+    bb.push(val >>> i & 1);
+}
+function getBit(x, i) {
+  return (x >>> i & 1) !== 0;
+}
+var QrSegment = class {
+  // Creates a new QR Code segment with the given attributes and data.
+  // The character count (numChars) must agree with the mode and the bit buffer length,
+  // but the constraint isn't checked. The given bit buffer is cloned and stored.
+  constructor(mode, numChars, bitData) {
+    this.mode = mode;
+    this.numChars = numChars;
+    this.bitData = bitData;
+    if (numChars < 0)
+      throw new RangeError("Invalid argument");
+    this.bitData = bitData.slice();
+  }
+  /* -- Methods -- */
+  // Returns a new copy of the data bits of this segment.
+  getData() {
+    return this.bitData.slice();
+  }
+};
+var MODE_NUMERIC = [1, 10, 12, 14];
+var MODE_ALPHANUMERIC = [2, 9, 11, 13];
+var MODE_BYTE = [4, 8, 16, 16];
+function numCharCountBits(mode, ver) {
+  return mode[Math.floor((ver + 7) / 17) + 1];
+}
+function makeBytes(data) {
+  const bb = [];
+  for (const b of data)
+    appendBits(b, 8, bb);
+  return new QrSegment(MODE_BYTE, data.length, bb);
+}
+function makeNumeric(digits) {
+  if (!isNumeric(digits))
+    throw new RangeError("String contains non-numeric characters");
+  const bb = [];
+  for (let i = 0; i < digits.length; ) {
+    const n = Math.min(digits.length - i, 3);
+    appendBits(Number.parseInt(digits.substring(i, i + n), 10), n * 3 + 1, bb);
+    i += n;
+  }
+  return new QrSegment(MODE_NUMERIC, digits.length, bb);
+}
+function makeAlphanumeric(text) {
+  if (!isAlphanumeric(text))
+    throw new RangeError("String contains unencodable characters in alphanumeric mode");
+  const bb = [];
+  let i;
+  for (i = 0; i + 2 <= text.length; i += 2) {
+    let temp = ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)) * 45;
+    temp += ALPHANUMERIC_CHARSET.indexOf(text.charAt(i + 1));
+    appendBits(temp, 11, bb);
+  }
+  if (i < text.length)
+    appendBits(ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)), 6, bb);
+  return new QrSegment(MODE_ALPHANUMERIC, text.length, bb);
+}
+function makeSegments(text) {
+  if (text === "")
+    return [];
+  else if (isNumeric(text))
+    return [makeNumeric(text)];
+  else if (isAlphanumeric(text))
+    return [makeAlphanumeric(text)];
+  else
+    return [makeBytes(toUtf8ByteArray(text))];
+}
+function isNumeric(text) {
+  return NUMERIC_REGEX.test(text);
+}
+function isAlphanumeric(text) {
+  return ALPHANUMERIC_REGEX.test(text);
+}
+function getTotalBits(segs, version) {
+  let result = 0;
+  for (const seg of segs) {
+    const ccbits = numCharCountBits(seg.mode, version);
+    if (seg.numChars >= 1 << ccbits)
+      return Number.POSITIVE_INFINITY;
+    result += 4 + ccbits + seg.bitData.length;
+  }
+  return result;
+}
+function toUtf8ByteArray(str) {
+  str = encodeURI(str);
+  const result = [];
+  for (let i = 0; i < str.length; i++) {
+    if (str.charAt(i) !== "%") {
+      result.push(str.charCodeAt(i));
+    } else {
+      result.push(Number.parseInt(str.substring(i + 1, i + 3), 16));
+      i += 2;
+    }
+  }
+  return result;
+}
+function getNumRawDataModules(ver) {
+  if (ver < MIN_VERSION || ver > MAX_VERSION)
+    throw new RangeError("Version number out of range");
+  let result = (16 * ver + 128) * ver + 64;
+  if (ver >= 2) {
+    const numAlign = Math.floor(ver / 7) + 2;
+    result -= (25 * numAlign - 10) * numAlign - 55;
+    if (ver >= 7)
+      result -= 36;
+  }
+  return result;
+}
+function getNumDataCodewords(ver, ecl) {
+  return Math.floor(getNumRawDataModules(ver) / 8) - ECC_CODEWORDS_PER_BLOCK[ecl[0]][ver] * NUM_ERROR_CORRECTION_BLOCKS[ecl[0]][ver];
+}
+function reedSolomonComputeDivisor(degree) {
+  if (degree < 1 || degree > 255)
+    throw new RangeError("Degree out of range");
+  const result = [];
+  for (let i = 0; i < degree - 1; i++)
+    result.push(0);
+  result.push(1);
+  let root = 1;
+  for (let i = 0; i < degree; i++) {
+    for (let j = 0; j < result.length; j++) {
+      result[j] = reedSolomonMultiply(result[j], root);
+      if (j + 1 < result.length)
+        result[j] ^= result[j + 1];
+    }
+    root = reedSolomonMultiply(root, 2);
+  }
+  return result;
+}
+function reedSolomonComputeRemainder(data, divisor) {
+  const result = divisor.map((_) => 0);
+  for (const b of data) {
+    const factor = b ^ result.shift();
+    result.push(0);
+    divisor.forEach((coef, i) => result[i] ^= reedSolomonMultiply(coef, factor));
+  }
+  return result;
+}
+function reedSolomonMultiply(x, y) {
+  if (x >>> 8 !== 0 || y >>> 8 !== 0)
+    throw new RangeError("Byte out of range");
+  let z = 0;
+  for (let i = 7; i >= 0; i--) {
+    z = z << 1 ^ (z >>> 7) * 285;
+    z ^= (y >>> i & 1) * x;
+  }
+  return z;
+}
+function encodeSegments(segs, ecl, minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true) {
+  if (!(MIN_VERSION <= minVersion && minVersion <= maxVersion && maxVersion <= MAX_VERSION) || mask < -1 || mask > 7) {
+    throw new RangeError("Invalid value");
+  }
+  let version;
+  let dataUsedBits;
+  for (version = minVersion; ; version++) {
+    const dataCapacityBits2 = getNumDataCodewords(version, ecl) * 8;
+    const usedBits = getTotalBits(segs, version);
+    if (usedBits <= dataCapacityBits2) {
+      dataUsedBits = usedBits;
+      break;
+    }
+    if (version >= maxVersion)
+      throw new RangeError("Data too long");
+  }
+  for (const newEcl of [MEDIUM, QUARTILE, HIGH]) {
+    if (boostEcl && dataUsedBits <= getNumDataCodewords(version, newEcl) * 8)
+      ecl = newEcl;
+  }
+  const bb = [];
+  for (const seg of segs) {
+    appendBits(seg.mode[0], 4, bb);
+    appendBits(seg.numChars, numCharCountBits(seg.mode, version), bb);
+    for (const b of seg.getData())
+      bb.push(b);
+  }
+  const dataCapacityBits = getNumDataCodewords(version, ecl) * 8;
+  appendBits(0, Math.min(4, dataCapacityBits - bb.length), bb);
+  appendBits(0, (8 - bb.length % 8) % 8, bb);
+  for (let padByte = 236; bb.length < dataCapacityBits; padByte ^= 236 ^ 17)
+    appendBits(padByte, 8, bb);
+  const dataCodewords = Array.from({ length: Math.ceil(bb.length / 8) }, () => 0);
+  bb.forEach((b, i) => dataCodewords[i >>> 3] |= b << 7 - (i & 7));
+  return new QrCode(version, ecl, dataCodewords, mask);
+}
+function encode(data, options) {
+  const {
+    ecc = "L",
+    boostEcc = false,
+    minVersion = 1,
+    maxVersion = 40,
+    maskPattern = -1,
+    border = 1
+  } = options || {};
+  const segment = typeof data === "string" ? makeSegments(data) : Array.isArray(data) ? [makeBytes(data)] : void 0;
+  if (!segment)
+    throw new Error(`uqr only supports encoding string and binary data, but got: ${typeof data}`);
+  const qr = encodeSegments(
+    segment,
+    EccMap[ecc],
+    minVersion,
+    maxVersion,
+    maskPattern,
+    boostEcc
+  );
+  const result = addBorder({
+    version: qr.version,
+    maskPattern: qr.mask,
+    size: qr.size,
+    data: qr.modules,
+    types: qr.types
+  }, border);
+  if (options?.invert)
+    result.data = result.data.map((row) => row.map((mod) => !mod));
+  options?.onEncoded?.(result);
+  return result;
+}
+function addBorder(input, border = 1) {
+  if (!border)
+    return input;
+  const { size } = input;
+  const newSize = size + border * 2;
+  input.size = newSize;
+  input.data.forEach((row) => {
+    for (let i = 0; i < border; i++) {
+      row.unshift(false);
+      row.push(false);
+    }
+  });
+  for (let i = 0; i < border; i++) {
+    input.data.unshift(Array.from({ length: newSize }, (_) => false));
+    input.data.push(Array.from({ length: newSize }, (_) => false));
+  }
+  const b = QrCodeDataType.Border;
+  input.types.forEach((row) => {
+    for (let i = 0; i < border; i++) {
+      row.unshift(b);
+      row.push(b);
+    }
+  });
+  for (let i = 0; i < border; i++) {
+    input.types.unshift(Array.from({ length: newSize }, (_) => b));
+    input.types.push(Array.from({ length: newSize }, (_) => b));
+  }
+  return input;
+}
+function getDataAt(data, x, y, defaults = false) {
+  if (x < 0 || y < 0 || x >= data.length || y >= data.length)
+    return defaults;
+  return data[y][x];
+}
+function renderUnicodeCompact(data, options = {}) {
+  const palette = {
+    WHITE_ALL: "\u2588",
+    WHITE_BLACK: "\u2580",
+    BLACK_WHITE: "\u2584",
+    BLACK_ALL: " "
+  };
+  const result = encode(data, options);
+  const WHITE = false;
+  const BLACK = true;
+  const at = (x, y) => getDataAt(result.data, x, y, true);
+  const lines = [];
+  let line = "";
+  for (let row = 0; row < result.size; row += 2) {
+    for (let col = 0; col < result.size; col++) {
+      if (at(col, row) === WHITE && at(col, row + 1) === WHITE)
+        line += palette.WHITE_ALL;
+      else if (at(col, row) === WHITE && at(col, row + 1) === BLACK)
+        line += palette.WHITE_BLACK;
+      else if (at(col, row) === BLACK && at(col, row + 1) === WHITE)
+        line += palette.BLACK_WHITE;
+      else
+        line += palette.BLACK_ALL;
+    }
+    lines.push(line);
+    line = "";
+  }
+  return lines.join("\n");
+}
+
+// packages/cli/src/qr.ts
+var ERROR_CORRECTION = "M";
+var TERMINAL_MARGIN = 2;
+function qrForTerminal(text) {
+  return renderUnicodeCompact(text, { ecc: ERROR_CORRECTION, border: TERMINAL_MARGIN }).replace(/\n$/, "");
+}
+
+// packages/cli/src/lan.ts
+var PRIVATE_IPV4 = /^(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})$/;
+var VIRTUAL_ADAPTER = /docker|veth|vmnet|vboxnet|vmware|virtualbox|hyper-v|vethernet|utun|tun\d|tap\d|ppp|ipsec|bridge|^br-|awdl|llw|tailscale|zerotier|^wg\d/i;
+var PHYSICAL_ADAPTER = /^(en|eth|wlan|wl)|wi-?fi|ethernet|이더넷/i;
+function reachableAddresses(entries) {
+  return (entries ?? []).filter((entry) => (entry.family === "IPv4" || entry.family === 4) && !entry.internal && PRIVATE_IPV4.test(entry.address)).map((entry) => entry.address);
+}
+function lanAddresses(interfaces) {
+  const usable = Object.entries(interfaces).filter(([name]) => !VIRTUAL_ADAPTER.test(name));
+  const physicalFirst = [...usable.filter(([name]) => PHYSICAL_ADAPTER.test(name)), ...usable.filter(([name]) => !PHYSICAL_ADAPTER.test(name))];
+  return [...new Set(physicalFirst.flatMap(([, entries]) => reachableAddresses(entries)))];
+}
+function lanUrl(address, port) {
+  return `http://${address}:${port}/`;
+}
+function formatLanAccess(port, addresses) {
+  const [first, ...others] = addresses.map((address) => lanUrl(address, port));
+  if (!first) return "\uD734\uB300\uD3F0\uC5D0\uC11C \uC5F4 \uC8FC\uC18C\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694. Wi-Fi \uC5F0\uACB0\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.\n";
+  const lines = [`\uD734\uB300\uD3F0\uC5D0\uC11C \uC5F4\uAE30 ${first}`, qrForTerminal(first), ...others.map((url) => `\uB2E4\uB978 \uC8FC\uC18C ${url}`), "\uD734\uB300\uD3F0\uACFC \uC774 \uCEF4\uD4E8\uD130\uAC00 \uAC19\uC740 Wi-Fi\uC5D0 \uC788\uC5B4\uC57C \uD574\uC694. \uC5F4\uB9AC\uC9C0 \uC54A\uC73C\uBA74 \uBC29\uD654\uBCBD\uC5D0\uC11C Node \uC5F0\uACB0\uC744 \uD5C8\uC6A9\uD574 \uC8FC\uC138\uC694."];
+  return `${lines.join("\n")}
+`;
+}
+
 // packages/cli/src/commands.ts
 var SAFE_FILE_NAME = /[^A-Za-z0-9._-]+/g;
+var LAN_HOST = "0.0.0.0";
 function parseEngine(value) {
   if (value === void 0) return void 0;
   if (!ENGINE_NAMES.includes(value)) throw new PackageError("ENGINE_INVALID", value);
@@ -2161,6 +2995,17 @@ function parseEngine(value) {
 function defaultOut(folder, version) {
   const name = path6.basename(path6.resolve(folder)).replace(SAFE_FILE_NAME, "-") || "game";
   return path6.resolve(`${name}-${version}.sbp`);
+}
+async function enforceSdkPolicy(version, io) {
+  const verdict = await checkSdkPolicy(version);
+  if (verdict.kind === "blocked") throw new CliError("SDK_VERSION_BLOCKED", verdict.message);
+  if (verdict.kind === "update-recommended") io.err(`${verdict.message}
+`);
+}
+async function announceSdkPolicy(version, io) {
+  const verdict = await checkSdkPolicy(version);
+  if (verdict.kind !== "ok") io.err(`${verdict.message}
+`);
 }
 async function writeInitialConfig(folder, force) {
   const target = path6.resolve(folder, CONFIG_FILE);
@@ -2192,6 +3037,7 @@ async function buildPackage(options) {
   return { ...report, warnings: [...resolved.warnings, ...report.warnings] };
 }
 async function runBuild(options, io) {
+  await enforceSdkPolicy(options.tool.version, io);
   io.out(formatBuildReport(await buildPackage(options)));
 }
 async function inspectPackage(file) {
@@ -2205,9 +3051,10 @@ async function runInspect(file, io) {
   io.out(formatInspectReport(await inspectPackage(file)));
 }
 async function runDeploy(options, io) {
-  const { file, values, envKey } = options;
+  const { file, values, envKey, toolVersion } = options;
   const { game, channel, note } = values;
   if (!file || !game || !channel) throw new CliError("USAGE", "deploy <\uD30C\uC77C> --game <\uAC8C\uC784 ID> --channel <\uCC44\uB110 \uD0A4>");
+  await enforceSdkPolicy(toolVersion, io);
   const consoleOrigin = values.console ?? DEFAULT_CONSOLE_ORIGIN;
   assertConsoleOrigin(consoleOrigin);
   const apiKey = resolveApiKey(values["api-key"], envKey);
@@ -2229,14 +3076,17 @@ function playSdkPaths() {
   return [path6.join(here, "v1.js"), path6.join(here, "../dist/v1.js")];
 }
 async function runDev(options, io) {
-  const { folder, values } = options;
+  const { values } = options;
+  if (values.lan && options.folder === void 0) throw new CliError("USAGE", "dev <\uBE4C\uB4DC \uD3F4\uB354> --lan");
+  if (values.lan && values.host !== void 0) throw new CliError("USAGE", "--lan\uC740 --host\uC640 \uAC19\uC774 \uC4F8 \uC218 \uC5C6\uC5B4\uC694");
+  const folder = options.folder ?? ".";
   const engine = parseEngine(values.engine);
   const info = await stat2(path6.resolve(folder)).catch(() => null);
   if (!info?.isDirectory()) throw new PackageError("FOLDER_MISSING", folder);
   const explicitPort = parsePort(values.port);
   const server = await startDevServer({
     folder,
-    host: values.host ?? "127.0.0.1",
+    host: values.host ?? (values.lan ? LAN_HOST : "127.0.0.1"),
     port: explicitPort ?? DEFAULT_DEV_PORT,
     fixedPort: explicitPort !== void 0,
     loadConfig: () => resolveConfig(folder, values.config),
@@ -2247,8 +3097,10 @@ async function runDev(options, io) {
   });
   io.out(`dev \uC11C\uBC84 ${server.url}
 `);
+  if (values.lan) io.out(formatLanAccess(server.port, lanAddresses(networkInterfaces())));
   io.out(values.zone ? `\uAC8C\uC784\uC874 ${values.zone} \uC5D0 \uB9DE\uCDB0 \uC8FC\uC785\uD588\uC5B4\uC694.
 ` : "\uAC8C\uC784\uC874 \uC5C6\uC774 \uD63C\uC790 \uC2E4\uD589\uB3FC\uC694. \uAD11\uACE0\uC640 \uACB0\uC81C\uB294 \uC2DC\uBBAC\uB808\uC774\uC158\uC774\uC5D0\uC694.\n");
+  void announceSdkPolicy(options.toolVersion, io);
   await new Promise((resolve) => {
     const stop = () => {
       void server.close().then(resolve);
@@ -2278,6 +3130,7 @@ build \uC635\uC158
 dev \uC635\uC158
   --port <\uBC88\uD638>       \uD3EC\uD2B8 (\uAE30\uBCF8: 8300\uBD80\uD130 \uBE48 \uD3EC\uD2B8)
   --host <\uC8FC\uC18C>       \uBC1B\uC744 \uC8FC\uC18C (\uAE30\uBCF8: 127.0.0.1)
+  --lan               \uAC19\uC740 Wi-Fi\uC758 \uD734\uB300\uD3F0\uC5D0\uC11C \uC5F4 \uC218 \uC788\uAC8C \uB744\uC6B0\uACE0 QR \uCF54\uB4DC\uB97C \uBCF4\uC5EC \uC918\uC694
   --zone <\uC8FC\uC18C>       \uAC8C\uC784\uC874 \uC8FC\uC18C (\uAE30\uBCF8: dev \uC11C\uBC84 \uC790\uC2E0 \u2014 \uC778\uD130\uB137 \uC5C6\uC774 \uC2DC\uBBAC\uB808\uC774\uC158\uC73C\uB85C \uB3CC\uC544\uC694)
   --config \xB7 --engine \xB7 --keep-maps  build\uC640 \uAC19\uC544\uC694
 
@@ -2301,6 +3154,7 @@ var OPTIONS = {
   "keep-maps": { type: "boolean" },
   port: { type: "string" },
   host: { type: "string" },
+  lan: { type: "boolean" },
   force: { type: "boolean" },
   game: { type: "string" },
   channel: { type: "string" },
@@ -2349,10 +3203,10 @@ async function main(argv, rawIo) {
         return EXIT_OK;
       }
       case "dev":
-        await runDev({ folder: rest[0] ?? ".", values }, io);
+        await runDev({ folder: rest[0], values, toolVersion: package_default.version }, io);
         return EXIT_OK;
       case "deploy":
-        await runDeploy({ file: rest[0], values, envKey: process.env[API_KEY_ENV] }, io);
+        await runDeploy({ file: rest[0], values, envKey: process.env[API_KEY_ENV], toolVersion: package_default.version }, io);
         return EXIT_OK;
       default:
         throw new CliError("USAGE", command);

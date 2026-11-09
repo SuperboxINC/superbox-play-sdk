@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -106,6 +106,90 @@ describe('dev server', () => {
     }
   });
 
+  describe('listening beyond this computer — browsers refuse Content-Encoding: br over plain http', () => {
+    let lan: DevServerHandle;
+    let origin = '';
+
+    before(async () => {
+      lan = await start({ host: '0.0.0.0' });
+      origin = `http://127.0.0.1:${lan.port}`;
+    });
+
+    after(async () => {
+      await lan.close();
+    });
+
+    for (const [pathname, expected, type] of [
+      ['/Build/a.wasm.br', BROTLI_BODY, 'application/wasm'],
+      ['/Build/b.js.gz', 'gz body', 'application/javascript'],
+    ] as const) {
+      it(`serves ${pathname} already decoded, with its real size`, async () => {
+        const response = await fetch(`${origin}${pathname}`, { headers: { 'accept-encoding': 'identity' } });
+        assert.equal(response.status, 200);
+        assert.equal(response.headers.get('content-encoding'), null);
+        assert.equal(response.headers.get('content-type'), type);
+        assert.equal(response.headers.get('cache-control'), 'no-store');
+        const body = Buffer.from(await response.arrayBuffer());
+        assert.equal(body.toString(), expected);
+        assert.equal(response.headers.get('content-length'), String(body.length));
+      });
+    }
+
+    it('answers HEAD with the decoded size and no body', async () => {
+      const response = await fetch(`${origin}/Build/a.wasm.br`, { method: 'HEAD' });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-encoding'), null);
+      assert.equal(response.headers.get('content-length'), String(Buffer.byteLength(BROTLI_BODY)));
+    });
+
+    it('sends the file as it is when it cannot be decoded', async () => {
+      const response = await fetch(`${origin}/Build/c.wasm.unityweb`, { method: 'HEAD' });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-encoding'), 'br');
+    });
+
+    it('decodes a file once, and again after a rebuild', async () => {
+      const file = path.join(folder, 'Build/e.data.br');
+      const stamp = new Date('2026-11-09T00:00:00Z');
+      const firstBuild = brotliCompressSync(Buffer.from('first build'));
+      const read = async (): Promise<string> => (await fetch(`${origin}/Build/e.data.br`)).text();
+      await writeFile(file, firstBuild);
+      await utimes(file, stamp, stamp);
+      try {
+        assert.equal(await read(), 'first build');
+
+        // 크기와 시각이 같으면 풀어 둔 것을 쓴다 — 이 내용을 다시 풀었다면 풀지 못해 다른 답이 나온다
+        await writeFile(file, Buffer.alloc(firstBuild.length));
+        await utimes(file, stamp, stamp);
+        assert.equal(await read(), 'first build');
+
+        await writeFile(file, brotliCompressSync(Buffer.from('second build')));
+        assert.equal(await read(), 'second build');
+      } finally {
+        await rm(file);
+      }
+    });
+
+    it('keeps hidden files and folders on this computer', async () => {
+      await mkdir(path.join(folder, '.git'), { recursive: true });
+      await writeFile(path.join(folder, '.env'), 'secret');
+      await writeFile(path.join(folder, '.git/config'), 'secret');
+      await writeFile(path.join(folder, 'Build/.hidden.js'), 'secret');
+      try {
+        for (const pathname of ['/.env', '/.git/config', '/Build/.hidden.js']) {
+          const response = await fetch(`${origin}${pathname}`);
+          assert.equal(response.status, 404, pathname);
+          assert.equal((await response.text()).includes('secret'), false, pathname);
+        }
+        assert.equal((await fetch(url('/.env'))).status, 200, '이 컴퓨터 안에서만 받으면 그대로 내린다');
+      } finally {
+        await rm(path.join(folder, '.env'));
+        await rm(path.join(folder, '.git'), { recursive: true });
+        await rm(path.join(folder, 'Build/.hidden.js'));
+      }
+    });
+  });
+
   it('labels compressed files with Content-Encoding and the inner type', async () => {
     const br = await rawGet('/Build/a.wasm.br');
     assert.equal(br.status, 200);
@@ -150,6 +234,19 @@ describe('dev server', () => {
     const prepared = await fetch(url('/link.txt'));
     assert.equal(prepared.status, 404);
     await rm(path.join(folder, 'link.txt'));
+  });
+
+  it('does not walk through a linked folder out of the folder', async () => {
+    await mkdir(path.join(root, 'outside'), { recursive: true });
+    await writeFile(path.join(root, 'outside/secret.js'), 'secret');
+    await symlink(path.join(root, 'outside'), path.join(folder, 'linked'));
+    try {
+      const response = await fetch(url('/linked/secret.js'));
+      assert.equal(response.status, 404);
+      assert.equal((await response.text()).includes('secret'), false);
+    } finally {
+      await rm(path.join(folder, 'linked'));
+    }
   });
 
   it('answers 404, 405 and bad requests plainly', async () => {

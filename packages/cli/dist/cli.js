@@ -1584,9 +1584,15 @@ function codeOfStatus(status) {
   if (status >= 500) return "SERVER_UNAVAILABLE";
   return "API_REJECTED";
 }
+var FIELD_ONLY_CODES = /* @__PURE__ */ new Set(["PLAY_BUILD_PACKAGE_ZONE_NOT_ALLOWED"]);
+function reasonOf(body) {
+  if (FIELD_ONLY_CODES.has(body.code)) return void 0;
+  const prefix = `${String(body.field)} \u2014 `;
+  return typeof body.message === "string" && body.message.startsWith(prefix) ? body.message.slice(prefix.length) : body.message;
+}
 function cliErrorFromApi(status, body) {
   const rawCode = body.code;
-  const parts = [body.field, body.message].filter((part) => typeof part === "string" && part.length > 0).map((part) => part.slice(0, MAX_DETAIL_LENGTH));
+  const parts = [body.field, reasonOf(body)].filter((part) => typeof part === "string" && part.length > 0).map((part) => part.slice(0, MAX_DETAIL_LENGTH));
   if (isKnownCode(rawCode)) return new CliError(rawCode, parts.join(" \u2014 ") || void 0);
   const received = typeof rawCode === "string" ? `${status} ${rawCode.slice(0, MAX_DETAIL_LENGTH)}` : String(status);
   return new CliError(codeOfStatus(status), [received, ...parts].join(" \u2014 "));

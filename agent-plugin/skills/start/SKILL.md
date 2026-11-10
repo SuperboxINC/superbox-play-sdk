@@ -39,7 +39,7 @@ argument-hint: '[게임 이름이나 엔진]'
 
 - 광고나 인앱 결제를 붙이려면 `integrate` 스킬을 써요.
 - 내 휴대폰에서 바로 보려면 `device-test` 스킬을 써요.
-- 콘솔에 올리고 출시까지 가려면 `release-check` 스킬을 써요.
+- 콘솔에 올리고 검수 요청까지 가려면 `release-check` 스킬을 써요.
 
 ## 지켜 주세요
 

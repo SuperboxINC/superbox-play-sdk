@@ -36,11 +36,11 @@ npx superbox-play build ./web-build          # web-build-1.0.0.sbp
 npx superbox-play inspect web-build-1.0.0.sbp
 ```
 
-만든 패키지는 콘솔 「출시」 화면의 「버전 등록하기」에 넣거나 `superbox-play deploy`로 올려요. 검수 요청과 출시는 콘솔이나 AI 도구에서 해요.
+만든 패키지는 콘솔 「출시」 화면의 「버전 등록하기」에 넣거나 `superbox-play deploy`로 올려요. 검수 요청은 콘솔이나 AI 도구에서 하고, 출시는 콘솔에서 해요.
 
 ## AI 도구에서 쓰기
 
-Claude Code에 플러그인을 설치하면 콘솔 MCP가 연결되고 시작, 기능 붙이기, 휴대폰 테스트, 출시 점검 스킬이 들어와요. 게임 등록부터 패키지 올리기, 검수 요청, 출시까지 AI 도구로 할 수 있어요.
+Claude Code에 플러그인을 설치하면 콘솔 MCP가 연결되고 시작, 기능 붙이기, 휴대폰 테스트, 출시 점검 스킬이 들어와요. 게임 등록부터 패키지 올리기, 검수 요청까지 AI 도구로 할 수 있어요. 새 버전 출시는 콘솔에서 직접 해요.
 
 ```text
 /plugin marketplace add SuperboxINC/superbox-play-sdk

@@ -85,7 +85,7 @@ function evaluateSdkPolicy(policy, version) {
 }
 
 // packages/phaser/src/update-notice.ts
-var PLUGIN_VERSION = "0.2.0";
+var PLUGIN_VERSION = "0.2.1";
 var CHECKED_DATE_KEY = "superbox-play.update-notice";
 var TIMEOUT_MS = 2e3;
 var LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;

@@ -1,6 +1,6 @@
 {
   "name": "@superbox-play/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "슈퍼박스 플레이 게임 패키지 도구 — superbox-play init · build · inspect · dev",
   "type": "module",
   "license": "SEE LICENSE IN ../../LICENSE",

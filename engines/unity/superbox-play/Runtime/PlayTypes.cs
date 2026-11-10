@@ -91,6 +91,11 @@ namespace Superbox.Play
         [Preserve, JsonProperty("key")] public string Key { get; private set; } = string.Empty;
         [Preserve, JsonProperty("displayName")] public string DisplayName { get; private set; } = string.Empty;
         [Preserve, JsonProperty("linked")] public bool Linked { get; private set; }
+        /// <summary>
+        /// 이 채널에서 이 게임을 출시 전에 사전예약했는지. 사전예약 보상(아이템)은 게임이 주고, 한 번만 주는 것은 게임이 <see cref="Key"/> 로 지킨다.
+        /// 게임존 밖(standalone) · 검수 미리보기 · 사전예약이 없던 게임 · 확인하지 못했을 때는 false.
+        /// </summary>
+        [Preserve, JsonProperty("preregistered")] public bool Preregistered { get; private set; }
     }
 
     [Preserve]

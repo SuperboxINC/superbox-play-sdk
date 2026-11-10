@@ -32,7 +32,13 @@ export interface SuperboxFeatures {
 export interface SuperboxSession {
   readonly protocol: 1;
   readonly environment: 'live' | 'sandbox' | 'standalone';
-  readonly player: { readonly key: string; readonly displayName: string; readonly linked: boolean };
+  readonly player: {
+    readonly key: string;
+    readonly displayName: string;
+    readonly linked: boolean;
+    /** 출시 전에 이 채널에서 사전예약했나 — 사전예약 보상은 게임이 key 로 한 번만 준다. 게임존 밖 · 확인하지 못했으면 false 이거나 없다 */
+    readonly preregistered?: boolean;
+  };
   readonly features: SuperboxFeatures;
   readonly safeArea: SuperboxSafeArea;
   readonly locale: string;

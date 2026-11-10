@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- `SuperboxPlay.Session.Player.Preregistered`가 생겼어요. 출시 전에 이 채널에서 사전예약한 플레이어면 참이라 사전예약 보상을 줄 때 써요. 게임존 밖이거나 확인하지 못했을 때는 거짓이에요.
+
 ## 0.2.0
 
 - 상단 메뉴 **Superbox Play > Test on Device**로 WebGL 빌드 뒤 QR을 찍어 같은 Wi-Fi의 휴대폰에서 바로 실행할 수 있어요.

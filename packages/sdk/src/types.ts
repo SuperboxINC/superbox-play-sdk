@@ -32,6 +32,11 @@ export interface PlayerInfo {
   readonly key: string;
   readonly displayName: string;
   readonly linked: boolean;
+  /**
+   * 이 채널에서 이 게임을 출시 전에 사전예약했는지(`session.init` 만). 사전예약 보상(아이템)은 게임이 주고, 한 번만 주는 것은 게임이 `key` 로 지킨다.
+   * 게임존 밖(standalone) · 검수 미리보기 · 사전예약이 없던 게임 · 확인하지 못했을 때는 false
+   */
+  readonly preregistered?: boolean;
 }
 
 export interface SessionInfo {

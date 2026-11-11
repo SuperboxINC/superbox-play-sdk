@@ -1,6 +1,6 @@
 {
   "name": "@superbox-play/package",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "슈퍼박스 플레이 게임 패키지 .sbp — manifest 검증 · 입구 주입 · ZIP 쓰기/읽기",
   "type": "module",
   "license": "SEE LICENSE IN ../../LICENSE",

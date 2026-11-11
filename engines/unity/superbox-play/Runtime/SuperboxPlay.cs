@@ -13,7 +13,7 @@ namespace Superbox.Play
     /// </summary>
     public static partial class SuperboxPlay
     {
-        public const string SdkVersion = "0.2.3";
+        public const string SdkVersion = "0.2.4";
 
         private const float RefreshTimeoutSeconds = 30f;
 

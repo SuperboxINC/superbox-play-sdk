@@ -14,8 +14,9 @@ namespace Superbox.Play
     internal sealed class PlayJsChannel : IPlayChannel
     {
         private const string DefaultSdkUrl = "https://game.superboxgo.com/sdk/play/v1.js";
-        // SDK 로드(jslib 15초) + SDK 의 독립 실행 판정(3초) — 여유를 둔다
-        private const float InitTimeoutSeconds = 30f;
+        // 안전장치일 뿐이다 — SDK 를 못 불러오면 jslib 이 15초에, 게임존 밖이면 SDK 가 3초에 스스로 답한다. 게임존에 붙으면 플레이어가 그 회사 약관에 동의할
+        // 때까지 게임존이 첫 세션을 붙잡는다(동의 화면은 게임존 몫). 0.2.3 까지의 30초는 약관을 읽는 동안 끊겨 게임존 밖 세션으로 시작했다 — 10분을 기다린다
+        private const float InitTimeoutSeconds = 600f;
 
         private readonly PlayCallTable table = new PlayCallTable();
         private bool started;

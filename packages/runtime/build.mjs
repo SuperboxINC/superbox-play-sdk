@@ -12,7 +12,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const TARGET = ['es2020', 'safari14.1', 'chrome80'];
 const OUTPUT = path.join(here, '../package-core/src/runtime-assets.generated.ts');
 
-export const BOOT_BUDGET_BYTES = 13 * 1024;
+// 13 → 14KB — Unity 기기 저장 자리 고정(unity.ts stableDocumentUrl)이 +0.5KB, 새 버전마다 진행 · 게스트 계정이 지워지던 것을 막는 값이다
+export const BOOT_BUDGET_BYTES = 14 * 1024;
 export const LOADING_BUDGET_BYTES = 3 * 1024;
 
 async function bundle(entry) {

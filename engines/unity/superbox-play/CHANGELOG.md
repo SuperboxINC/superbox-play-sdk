@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5
+
+- 기기 저장(PlayerPrefs · `Application.persistentDataPath`)이 새 버전에서도 이어져요. 전에는 버전마다 게임 문서의 폴더가 달라서 새 버전이 처음부터 시작했어요. 패키지가 Unity를 시작하기 전에 문서 주소를 게임마다 하나인 주소로 고정해요.
+- `Application.absoluteURL`은 고정한 주소(`…/persistent/index.html`)를 반환해요. 게임 파일 주소는 `Application.streamingAssetsPath`를 써 주세요. 템플릿에서 `document.URL`을 직접 고정했다면 그 값을 그대로 둬요.
+- **Build & Package**와 **Test on Device**는 **Run In Background**가 꺼져 있으면 Console에 경고를 남겨요. 게임존이 광고나 결제 창을 띄우는 동안 게임이 멈출 수 있어서, 켜고 멈춤은 `SuperboxPlay.Paused` · `Resumed`로 처리하기를 권해요.
+
 ## 0.2.4
 
 - 게임존의 첫 세션을 10분까지 기다려요. 전에는 30초가 지나면 게임존 밖 세션으로 시작해서, 플레이어가 약관 동의를 오래 읽으면 광고와 결제를 쓸 수 없었어요. 이전 버전도 동의를 오래 기다렸으면 게임존이 `session.changed`를 보내 세션을 다시 읽어요.

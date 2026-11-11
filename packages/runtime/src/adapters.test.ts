@@ -5,7 +5,7 @@ import { createClassifier } from './error-watch.ts';
 import { createLoading, type LoadingController } from './loading-api.ts';
 import { recommendPixelRatio, type DeviceHints } from './pixel-ratio.ts';
 import type { BootConfig, LoadingView } from './types.ts';
-import { installUnityGlue, type UnityWindow } from './unity.ts';
+import { installUnityGlue, pinDocumentUrl, stableDocumentUrl, type UnityWindow } from './unity.ts';
 
 function silentView(): LoadingView {
   return { attach: () => undefined, setProgress: () => undefined, setAppInfo: () => undefined, hide: () => undefined, showError: () => undefined, hideError: () => undefined };
@@ -83,6 +83,8 @@ describe('recommendPixelRatio', () => {
 
 interface UnityHarness {
   readonly win: UnityWindow;
+  /** 지금 document.URL — 부르는 순간 무엇이었는지 시험이 읽는다 */
+  readonly documentUrl: () => string;
   readonly loading: LoadingController;
   fireLoad(): void;
   tick(): void;
@@ -90,23 +92,42 @@ interface UnityHarness {
   advance(ms: number): void;
 }
 
-function unityHarness(ratio: number | null = null): UnityHarness {
-  const win: UnityWindow = {};
+const GAME_DOCUMENT = 'https://golf-hero-3d.superboxgo.com/b_j1gh07gz2t/index.html';
+
+/** 게임 문서 가짜 — url 은 템플릿이 먼저 덮은 document.URL, locked 는 defineProperty 를 거절하는 문서, brokenLocation 은 location 을 못 읽는 창 */
+interface FakePage {
+  readonly href: string;
+  readonly url?: string;
+  readonly locked?: boolean;
+  readonly brokenLocation?: boolean;
+}
+
+// 앞의 시험들은 저장 자리 고정과 상관없이 설정 · 진행률을 본다 — 덮지 못하는 문서로 둔다(그때는 설정을 그대로 넘긴다)
+function unityHarness(ratio: number | null = null, page: FakePage = { href: GAME_DOCUMENT, locked: true }): UnityHarness {
+  const win: UnityWindow & { readonly location: { readonly href: string } } = {
+    get location() {
+      if (page.brokenLocation) throw new Error('location 을 읽지 못했다');
+      return { href: page.href };
+    },
+  };
   const loading = makeLoading();
   let onLoad: (() => void) | null = null;
   let tick: (() => void) | null = null;
   let clock = 0;
   const frames: (() => void)[] = [];
+  const doc = {
+    URL: page.url ?? page.href,
+    addEventListener: ((_type: string, listener: () => void) => {
+      onLoad = listener;
+    }) as Document['addEventListener'],
+    removeEventListener: (() => {
+      onLoad = null;
+    }) as Document['removeEventListener'],
+  };
+  if (page.locked) Object.freeze(doc);
   installUnityGlue({
     win,
-    doc: {
-      addEventListener: ((_type: string, listener: () => void) => {
-        onLoad = listener;
-      }) as Document['addEventListener'],
-      removeEventListener: (() => {
-        onLoad = null;
-      }) as Document['removeEventListener'],
-    },
+    doc,
     loading,
     pixelRatio: () => ratio,
     classify: (message) => (/webgl/i.test(message) ? 'WEBGL_CONTEXT' : 'ENGINE_INIT'),
@@ -122,6 +143,7 @@ function unityHarness(ratio: number | null = null): UnityHarness {
   });
   return {
     win,
+    documentUrl: () => doc.URL,
     loading,
     fireLoad: () => onLoad?.(),
     tick: () => tick?.(),
@@ -213,12 +235,13 @@ describe('Unity glue', () => {
   });
 
   it('a throwing pixel ratio does not stop the game', async () => {
-    const win: UnityWindow = {};
+    const win: UnityWindow & { readonly location: { readonly href: string } } = { location: { href: GAME_DOCUMENT } };
     const loading = makeLoading();
     let onLoad: (() => void) | null = null;
     installUnityGlue({
       win,
       doc: {
+        URL: GAME_DOCUMENT,
         addEventListener: ((_type: string, listener: () => void) => {
           onLoad = listener;
         }) as Document['addEventListener'],
@@ -262,6 +285,110 @@ describe('Unity glue', () => {
     h.fireLoad();
     h.tick();
     assert.equal(h.win.createUnityInstance, wrapped);
+  });
+});
+
+/** createUnityInstance 를 부르는 순간의 document.URL 과 넘긴 설정 */
+interface UnityCall {
+  readonly url: string;
+  readonly config: unknown;
+}
+
+function recordUnityCalls(h: UnityHarness): UnityCall[] {
+  const calls: UnityCall[] = [];
+  h.win.createUnityInstance = async (_canvas, config) => {
+    calls.push({ url: h.documentUrl(), config });
+    return 'instance';
+  };
+  h.fireLoad();
+  return calls;
+}
+
+describe('Unity storage — 기기 저장 자리를 버전과 상관없이', () => {
+  it('고정 주소 = 게임 문서 폴더(빌드 키)의 위 폴더 + persistent/index.html, 쿼리는 그대로 · # 뒤는 뺀다', () => {
+    assert.equal(stableDocumentUrl(GAME_DOCUMENT), 'https://golf-hero-3d.superboxgo.com/persistent/index.html');
+    assert.equal(
+      stableDocumentUrl('https://golf-hero-3d.superboxgo.com/b_next/index.html?from=zone#top'),
+      'https://golf-hero-3d.superboxgo.com/persistent/index.html?from=zone',
+    );
+    // 로컬 LocalStack 은 한 출처에 게임이 모여 있다 — 게임 폴더 아래라 게임끼리 섞이지 않는다
+    assert.equal(
+      stableDocumentUrl('http://localhost:4566/superbox-html5-games/golf-hero-3d/b_1/index.html'),
+      'http://localhost:4566/superbox-html5-games/golf-hero-3d/persistent/index.html',
+    );
+    // 맨 위 폴더에서 연 문서(CLI dev · Test on Device)
+    assert.equal(stableDocumentUrl('http://192.168.0.10:8080/index.html'), 'http://192.168.0.10:8080/persistent/index.html');
+  });
+
+  it('두 버전이 같은 자리를 쓴다 — 골프 히어로가 템플릿에서 고정한 값(location.origin + /persistent/index.html)과 같다', () => {
+    const first = stableDocumentUrl('https://golf-hero-3d.superboxgo.com/b_a/index.html');
+    assert.equal(first, stableDocumentUrl('https://golf-hero-3d.superboxgo.com/b_b/index.html'));
+    assert.equal(first, `${new URL(first).origin}/persistent/index.html`);
+  });
+
+  it('부르기 전에 document.URL 을 고정하고, streamingAssetsUrl 은 실제 위치 기준 절대 주소로 — 템플릿 설정은 고치지 않는다', async () => {
+    const h = unityHarness(null, { href: GAME_DOCUMENT });
+    const calls = recordUnityCalls(h);
+    const templateConfig = { dataUrl: 'Build/golf.data' };
+    assert.equal(await h.win.createUnityInstance?.({}, templateConfig), 'instance');
+    assert.deepEqual(calls[0], {
+      url: 'https://golf-hero-3d.superboxgo.com/persistent/index.html',
+      config: { dataUrl: 'Build/golf.data', streamingAssetsUrl: 'https://golf-hero-3d.superboxgo.com/b_j1gh07gz2t/StreamingAssets' },
+    });
+    assert.deepEqual(templateConfig, { dataUrl: 'Build/golf.data' });
+  });
+
+  it('템플릿이 준 streamingAssetsUrl 도 실제 위치 기준 — 상대 주소는 풀고 절대 주소는 그대로', async () => {
+    const h = unityHarness(null, { href: GAME_DOCUMENT });
+    const calls = recordUnityCalls(h);
+    await h.win.createUnityInstance?.({}, { streamingAssetsUrl: 'Assets/Streaming' });
+    await h.win.createUnityInstance?.({}, { streamingAssetsUrl: 'https://cdn.example/streaming' });
+    assert.deepEqual(calls[0]?.config, { streamingAssetsUrl: 'https://golf-hero-3d.superboxgo.com/b_j1gh07gz2t/Assets/Streaming' });
+    assert.deepEqual(calls[1]?.config, { streamingAssetsUrl: 'https://cdn.example/streaming' });
+  });
+
+  it('두 번 불러도 한 번 정한 자리 그대로 — 두 번째도 streamingAssetsUrl 을 실제 위치로 푼다(document.URL 은 이미 고정이다)', async () => {
+    const h = unityHarness(null, { href: GAME_DOCUMENT });
+    const calls = recordUnityCalls(h);
+    await h.win.createUnityInstance?.({}, {});
+    await h.win.createUnityInstance?.({}, {});
+    assert.equal(calls[1]?.url, 'https://golf-hero-3d.superboxgo.com/persistent/index.html');
+    assert.deepEqual(calls[1]?.config, { streamingAssetsUrl: 'https://golf-hero-3d.superboxgo.com/b_j1gh07gz2t/StreamingAssets' });
+  });
+
+  it('템플릿이 먼저 고정했으면(document.URL ≠ 실제 주소) 그 값을 두고 설정도 손대지 않는다', async () => {
+    const own = 'https://golf-hero-3d.superboxgo.com/my-save/index.html';
+    const h = unityHarness(null, { href: GAME_DOCUMENT, url: own });
+    const calls = recordUnityCalls(h);
+    const templateConfig = { streamingAssetsUrl: 'https://golf-hero-3d.superboxgo.com/b_j1gh07gz2t/StreamingAssets' };
+    await h.win.createUnityInstance?.({}, templateConfig);
+    assert.equal(calls[0]?.url, own);
+    assert.equal(calls[0]?.config, templateConfig);
+  });
+
+  it('고정하지 못하면(브라우저가 거절) 지금처럼 — 설정을 그대로 넘기고 게임은 뜬다', async () => {
+    const h = unityHarness(null, { href: GAME_DOCUMENT, locked: true });
+    const calls = recordUnityCalls(h);
+    const templateConfig = { dataUrl: 'Build/golf.data' };
+    assert.equal(await h.win.createUnityInstance?.({}, templateConfig), 'instance');
+    assert.equal(calls[0]?.url, GAME_DOCUMENT);
+    assert.equal(calls[0]?.config, templateConfig);
+  });
+
+  it('주소를 읽다 던져도 게임은 뜬다 — 설정 그대로, document.URL 도 그대로', async () => {
+    const h = unityHarness(null, { href: GAME_DOCUMENT, brokenLocation: true });
+    const calls = recordUnityCalls(h);
+    const templateConfig = { dataUrl: 'Build/golf.data' };
+    assert.equal(await h.win.createUnityInstance?.({}, templateConfig), 'instance');
+    assert.equal(calls[0]?.url, GAME_DOCUMENT);
+    assert.equal(calls[0]?.config, templateConfig);
+  });
+
+  it('pinDocumentUrl — 문서의 URL 을 덮어 그 값을 읽게 하고, 못 덮으면 false', () => {
+    const doc = { URL: GAME_DOCUMENT };
+    assert.equal(pinDocumentUrl(doc, 'https://golf-hero-3d.superboxgo.com/persistent/index.html'), true);
+    assert.equal(doc.URL, 'https://golf-hero-3d.superboxgo.com/persistent/index.html');
+    assert.equal(pinDocumentUrl(Object.freeze({ URL: GAME_DOCUMENT }), 'https://golf-hero-3d.superboxgo.com/persistent/index.html'), false);
   });
 });
 

@@ -23,6 +23,13 @@ namespace Superbox.Play.Editor
         private const string RequestFile = "Temp/superbox-play-package.json";
         private const string PackagerScriptName = "package-build.mjs";
 
+        /// <summary>
+        /// 게임은 게임존 iframe 안에서 돈다 — 게임존이 광고 · 결제 창을 띄우는 동안 게임 창이 포커스를 잃고, Run In Background 를 끈 빌드는 그동안 게임 루프가
+        /// 멈춘다(포커스로 일시정지 창을 띄우는 게임은 창이 남는다). 막지는 않고 경고만 — 멈춤은 SuperboxPlay.Paused · Resumed 로 처리하게 안내한다
+        /// </summary>
+        internal const string RunInBackgroundOffMessage =
+            "Run In Background가 꺼져 있어요. 게임존이 광고나 결제 창을 띄우는 동안 게임이 멈출 수 있어요. Player Settings > Resolution and Presentation에서 Run In Background를 켜고, 멈춤은 SuperboxPlay.Paused와 Resumed로 처리해 주세요.";
+
         [MenuItem(BuildMenu)]
         public static void Run() => Perform(zoneOrigin: null);
 
@@ -54,6 +61,8 @@ namespace Superbox.Play.Editor
                 var script = ToolScript(scriptName);
                 var projectDir = Path.GetDirectoryName(Application.dataPath);
                 StopIfVersionBlocked(node, projectDir);
+                if (!PlayerSettings.runInBackground)
+                    Debug.LogWarning($"{LogPrefix} {RunInBackgroundOffMessage}");
                 var playerFolder = BuildPlayer(projectDir);
                 next(node, script, projectDir, playerFolder);
             }

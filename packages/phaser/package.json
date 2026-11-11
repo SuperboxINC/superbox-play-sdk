@@ -1,6 +1,6 @@
 {
   "name": "@superbox-play/phaser",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "슈퍼박스 플레이 Phaser 플러그인 — 로더 진행률 · 첫 씬 · 일시정지 · 안전 영역을 잇는다 (Phaser 3.60+ · 4)",
   "type": "module",
   "license": "SEE LICENSE IN ../../LICENSE",
@@ -15,7 +15,7 @@
   },
   "files": ["dist"],
   "dependencies": {
-    "@superbox-play/sdk": "0.2.2"
+    "@superbox-play/sdk": "0.2.3"
   },
   "peerDependencies": {
     "phaser": ">=3.60.0 <5"

@@ -2,7 +2,7 @@
  * 로컬에서 실행할 때 새 SDK 버전을 알린다 — Unity · Cocos 에디터의 창과 같은 정책 파일 · 하루 한 번(이 컴퓨터의 날짜)이다.
  * Phaser 에는 에디터가 없어 게임 화면 위에 띄운다. 운영 주소에서는 묻지도 않고, 어떤 실패도 게임으로 던지지 않는다.
  */
-export declare const PLUGIN_VERSION = "0.2.2";
+export declare const PLUGIN_VERSION = "0.2.3";
 interface NoticeElement {
     id: string;
     type?: string;

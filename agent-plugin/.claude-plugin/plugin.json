@@ -1,6 +1,6 @@
 {
   "name": "superbox-play",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "슈퍼박스 플레이 콘솔 MCP를 연결하고, 게임 등록부터 검수 요청까지 도와줘요.",
   "author": {
     "name": "SUPERBOX Inc"

@@ -1,7 +1,7 @@
 {
   "package_version": 2,
   "name": "superbox-play",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "title": "Superbox Play",
   "description": "web-mobile · web-desktop 빌드를 슈퍼박스 플레이 패키지(.sbp)로 묶고 게임 코드에서 SuperboxPlay 를 쓰게 한다",
   "author": "SUPERBOX",

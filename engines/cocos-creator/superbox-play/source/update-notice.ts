@@ -1,18 +1,31 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { checkSdkPolicy } from '../../../../packages/package-core/src/node/sdk-policy-check.ts';
+import type { SdkPolicyVerdict } from '../../../../packages/package-core/src/sdk-policy.ts';
+import { inspectSdkPolicy } from '../../../../packages/package-core/src/node/sdk-policy-check.ts';
 
 /**
- * 에디터를 켤 때 새 SDK 버전을 알린다 — Unity 에디터의 팝업 · Phaser 플러그인과 같은 정책 파일 · 같은 문구 · 프로젝트마다 하루 한 번이다.
+ * 에디터를 켤 때 새 SDK 버전을 알린다 — Unity 에디터의 창과 같은 정책 파일 · 프로젝트마다 하루 한 번(이 컴퓨터의 날짜)이다.
+ * 그날은 결론이 났을 때만 쓴다 — 정책을 읽지 못하면 다음에 켤 때 다시 본다.
  * 확장은 프로젝트에 복사해 쓰는 폴더라 스스로 갈아 끼우지 않고 설치 안내를 연다. 어떤 실패도 에디터로 던지지 않는다.
  */
 export const UPDATE_DOCS_URL = 'https://developers.superboxgo.com/engines/cocos-creator';
 
-const DIALOG_TITLE = 'Superbox Play';
+const DIALOG_TITLE = 'Superbox Play SDK 업데이트';
 const OPEN_GUIDE = 0;
 const LATER = 1;
 const BUTTONS = ['설치 안내 보기', '나중에'];
 const CHECKED_DATE_FILE = 'temp/superbox-play-update-notice';
+
+/** 하루 = 이 컴퓨터의 날짜(Unity 창과 같다) — UTC 로 세면 한국 오전 9시에 날이 바뀐다 */
+function localDay(now: Date): string {
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function noticeBody(verdict: Exclude<SdkPolicyVerdict, { readonly kind: 'ok' }>, version: string): string {
+  const lead = verdict.kind === 'blocked' ? verdict.message : '새로운 SDK 버전이 있어요.';
+  return `${lead}\n\n현재: v${version}\n최신: v${verdict.latestVersion}\n\n설치 안내에서 새 버전을 받아 주세요.`;
+}
 
 /** 이 파일이 쓰는 에디터 API 만 — 시험이 대역을 넣는다 */
 export interface UpdateNoticeEditor {
@@ -35,13 +48,14 @@ export async function notifyUpdate(options: UpdateNoticeOptions): Promise<void> 
   const { editor, projectDir, version, now = new Date() } = options;
   try {
     const checkedDateFile = path.join(projectDir, CHECKED_DATE_FILE);
-    const today = now.toISOString().slice(0, 10);
+    const today = localDay(now);
     if ((await readFile(checkedDateFile, 'utf8').catch(() => '')) === today) return;
+    const { verdict, policy } = await inspectSdkPolicy(version);
+    if (policy === 'unreadable') return;
     await mkdir(path.dirname(checkedDateFile), { recursive: true });
     await writeFile(checkedDateFile, today);
-    const verdict = await checkSdkPolicy(version);
     if (verdict.kind === 'ok') return;
-    const { response } = await editor.Dialog.info(verdict.message, { title: DIALOG_TITLE, buttons: BUTTONS, default: OPEN_GUIDE, cancel: LATER });
+    const { response } = await editor.Dialog.info(noticeBody(verdict, version), { title: DIALOG_TITLE, buttons: BUTTONS, default: OPEN_GUIDE, cancel: LATER });
     if (response === OPEN_GUIDE) editor.Message.send('program', 'open-url', UPDATE_DOCS_URL);
   } catch (error) {
     console.warn(`[superbox-play] 새 버전을 확인하지 못했어요. ${error instanceof Error ? error.message : String(error)}`);

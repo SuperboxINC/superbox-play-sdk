@@ -1,10 +1,16 @@
 import { evaluateSdkPolicy, parseSdkPolicy, SDK_POLICY_URL } from './sdk-policy.ts';
 
 /**
- * 로컬에서 실행할 때 새 SDK 버전을 알린다 — Unity · Cocos 에디터의 팝업과 같은 정책 파일 · 같은 문구 · 하루 한 번이다.
+ * 로컬에서 실행할 때 새 SDK 버전을 알린다 — Unity · Cocos 에디터의 창과 같은 정책 파일 · 하루 한 번(이 컴퓨터의 날짜)이다.
  * Phaser 에는 에디터가 없어 게임 화면 위에 띄운다. 운영 주소에서는 묻지도 않고, 어떤 실패도 게임으로 던지지 않는다.
  */
-export const PLUGIN_VERSION = '0.2.1';
+export const PLUGIN_VERSION = '0.2.2';
+
+/** 하루 = 이 컴퓨터의 날짜(Unity · Cocos 창과 같다) — UTC 로 세면 한국 오전 9시에 날이 바뀐다 */
+function localDay(now: Date): string {
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
 
 const CHECKED_DATE_KEY = 'superbox-play.update-notice';
 const TIMEOUT_MS = 2000;
@@ -54,7 +60,7 @@ function render(document: UpdateNoticeWindow['document'], message: string, lates
 export async function showUpdateNotice(win: UpdateNoticeWindow, now: Date = new Date()): Promise<void> {
   try {
     if (!LOCAL_HOST.test(win.location.hostname)) return;
-    const today = now.toISOString().slice(0, 10);
+    const today = localDay(now);
     if (win.localStorage.getItem(CHECKED_DATE_KEY) === today) return;
     win.localStorage.setItem(CHECKED_DATE_KEY, today);
     const response = await win.fetch(SDK_POLICY_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });

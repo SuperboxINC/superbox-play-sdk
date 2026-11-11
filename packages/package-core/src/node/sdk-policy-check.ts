@@ -46,9 +46,25 @@ function readJson(url: string, timeoutMs: number): Promise<unknown> {
   });
 }
 
-export async function checkSdkPolicy(version: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<SdkPolicyVerdict> {
+/** 정책을 어떻게 봤나 — 읽음 · 끔(`SUPERBOX_PLAY_POLICY_URL=off`) · 읽지 못함(네트워크 · 시간 초과 · 틀린 파일). */
+export type SdkPolicySource = 'read' | 'off' | 'unreadable';
+
+export interface SdkPolicyInspection {
+  readonly verdict: SdkPolicyVerdict;
+  readonly policy: SdkPolicySource;
+}
+
+/**
+ * 판정과 함께 정책을 실제로 읽었는지 — 판정만 보면 「최신이다」와 「확인하지 못했다」가 같은 `ok` 라서,
+ * 에디터를 켤 때의 알림이 이것으로 갈라 못 읽었으면 다음 로드에서 다시 본다.
+ */
+export async function inspectSdkPolicy(version: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<SdkPolicyInspection> {
   const configured = process.env[SDK_POLICY_URL_ENV];
-  if (configured === POLICY_OFF) return OK;
+  if (configured === POLICY_OFF) return { verdict: OK, policy: 'off' };
   const policy = await readJson(configured || SDK_POLICY_URL, timeoutMs).then(parseSdkPolicy, () => null);
-  return policy ? evaluateSdkPolicy(policy, version) : OK;
+  return policy ? { verdict: evaluateSdkPolicy(policy, version), policy: 'read' } : { verdict: OK, policy: 'unreadable' };
+}
+
+export async function checkSdkPolicy(version: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<SdkPolicyVerdict> {
+  return (await inspectSdkPolicy(version, timeoutMs)).verdict;
 }

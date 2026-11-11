@@ -45,7 +45,7 @@ module.exports = __toCommonJS(main_exports);
 var package_default = {
   package_version: 2,
   name: "superbox-play",
-  version: "0.2.1",
+  version: "0.2.2",
   title: "Superbox Play",
   description: "web-mobile \xB7 web-desktop \uBE4C\uB4DC\uB97C \uC288\uD37C\uBC15\uC2A4 \uD50C\uB808\uC774 \uD328\uD0A4\uC9C0(.sbp)\uB85C \uBB36\uACE0 \uAC8C\uC784 \uCF54\uB4DC\uC5D0\uC11C SuperboxPlay \uB97C \uC4F0\uAC8C \uD55C\uB2E4",
   author: "SUPERBOX",
@@ -169,31 +169,45 @@ function readJson(url, timeoutMs) {
     request.on("error", reject);
   });
 }
-async function checkSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
+async function inspectSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const configured = process.env[SDK_POLICY_URL_ENV];
-  if (configured === POLICY_OFF) return OK;
+  if (configured === POLICY_OFF) return { verdict: OK, policy: "off" };
   const policy = await readJson(configured || SDK_POLICY_URL, timeoutMs).then(parseSdkPolicy, () => null);
-  return policy ? evaluateSdkPolicy(policy, version) : OK;
+  return policy ? { verdict: evaluateSdkPolicy(policy, version), policy: "read" } : { verdict: OK, policy: "unreadable" };
 }
 
 // engines/cocos-creator/superbox-play/source/update-notice.ts
 var UPDATE_DOCS_URL = "https://developers.superboxgo.com/engines/cocos-creator";
-var DIALOG_TITLE = "Superbox Play";
+var DIALOG_TITLE = "Superbox Play SDK \uC5C5\uB370\uC774\uD2B8";
 var OPEN_GUIDE = 0;
 var LATER = 1;
 var BUTTONS = ["\uC124\uCE58 \uC548\uB0B4 \uBCF4\uAE30", "\uB098\uC911\uC5D0"];
 var CHECKED_DATE_FILE = "temp/superbox-play-update-notice";
+function localDay(now) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+function noticeBody(verdict, version) {
+  const lead = verdict.kind === "blocked" ? verdict.message : "\uC0C8\uB85C\uC6B4 SDK \uBC84\uC804\uC774 \uC788\uC5B4\uC694.";
+  return `${lead}
+
+\uD604\uC7AC: v${version}
+\uCD5C\uC2E0: v${verdict.latestVersion}
+
+\uC124\uCE58 \uC548\uB0B4\uC5D0\uC11C \uC0C8 \uBC84\uC804\uC744 \uBC1B\uC544 \uC8FC\uC138\uC694.`;
+}
 async function notifyUpdate(options) {
   const { editor, projectDir, version, now = /* @__PURE__ */ new Date() } = options;
   try {
     const checkedDateFile = import_node_path.default.join(projectDir, CHECKED_DATE_FILE);
-    const today = now.toISOString().slice(0, 10);
+    const today = localDay(now);
     if (await (0, import_promises.readFile)(checkedDateFile, "utf8").catch(() => "") === today) return;
+    const { verdict, policy } = await inspectSdkPolicy(version);
+    if (policy === "unreadable") return;
     await (0, import_promises.mkdir)(import_node_path.default.dirname(checkedDateFile), { recursive: true });
     await (0, import_promises.writeFile)(checkedDateFile, today);
-    const verdict = await checkSdkPolicy(version);
     if (verdict.kind === "ok") return;
-    const { response } = await editor.Dialog.info(verdict.message, { title: DIALOG_TITLE, buttons: BUTTONS, default: OPEN_GUIDE, cancel: LATER });
+    const { response } = await editor.Dialog.info(noticeBody(verdict, version), { title: DIALOG_TITLE, buttons: BUTTONS, default: OPEN_GUIDE, cancel: LATER });
     if (response === OPEN_GUIDE) editor.Message.send("program", "open-url", UPDATE_DOCS_URL);
   } catch (error) {
     console.warn(`[superbox-play] \uC0C8 \uBC84\uC804\uC744 \uD655\uC778\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. ${error instanceof Error ? error.message : String(error)}`);

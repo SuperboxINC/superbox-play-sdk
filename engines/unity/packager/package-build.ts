@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { VERSION_PATTERN, type PackageWarning } from '../../../packages/package-core/src/browser.ts';
-import { checkSdkPolicy, CONFIG_FILE, createPackage, loadConfigFile, type PackageReport, type SuperboxConfig } from '../../../packages/package-core/src/index.ts';
+import { CONFIG_FILE, createPackage, inspectSdkPolicy, loadConfigFile, type PackageReport, type SdkPolicySource, type SuperboxConfig } from '../../../packages/package-core/src/index.ts';
 import unityPackage from '../superbox-play/package.json' with { type: 'json' };
 
 /**
@@ -30,11 +30,22 @@ function withPlayerSettings(config: SuperboxConfig, request: UnityPackageRequest
   return { ...config, ...(version === undefined ? {} : { version }), ...(title === undefined ? {} : { title }), engine: 'unity' };
 }
 
-/** 메뉴가 오래 걸리는 빌드 전에 묻는 도구 버전 판정 — 막을지와 알릴 말 */
-export async function unityPolicyAnswer(): Promise<{ readonly ok: true; readonly blocked: boolean; readonly message: string; readonly latestVersion: string }> {
-  const verdict = await checkSdkPolicy(unityPackage.version);
-  if (verdict.kind === 'ok') return { ok: true, blocked: false, message: '', latestVersion: '' };
-  return { ok: true, blocked: verdict.kind === 'blocked', message: verdict.message, latestVersion: verdict.latestVersion };
+/**
+ * 도구 버전 판정 — 빌드 메뉴는 오래 걸리는 빌드 전에, 에디터는 켤 때 묻는다. 막을지 · 알릴 말 · 정책을 어떻게 봤는지
+ * (`unreadable` 이면 에디터가 「최신」으로 치지 않고 다음 로드에서 다시 본다).
+ */
+export type UnityPolicyAnswer = {
+  readonly ok: true;
+  readonly blocked: boolean;
+  readonly message: string;
+  readonly latestVersion: string;
+  readonly policy: SdkPolicySource;
+};
+
+export async function unityPolicyAnswer(): Promise<UnityPolicyAnswer> {
+  const { verdict, policy } = await inspectSdkPolicy(unityPackage.version);
+  if (verdict.kind === 'ok') return { ok: true, blocked: false, message: '', latestVersion: '', policy };
+  return { ok: true, blocked: verdict.kind === 'blocked', message: verdict.message, latestVersion: verdict.latestVersion, policy };
 }
 
 /** 프로젝트의 설정 파일 + Player Settings — 패키징과 기기 테스트가 같은 값을 쓴다 */

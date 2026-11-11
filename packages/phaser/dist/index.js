@@ -85,7 +85,11 @@ function evaluateSdkPolicy(policy, version) {
 }
 
 // packages/phaser/src/update-notice.ts
-var PLUGIN_VERSION = "0.2.1";
+var PLUGIN_VERSION = "0.2.2";
+function localDay(now) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
 var CHECKED_DATE_KEY = "superbox-play.update-notice";
 var TIMEOUT_MS = 2e3;
 var LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
@@ -112,7 +116,7 @@ function render(document, message, latestVersion) {
 async function showUpdateNotice(win, now = /* @__PURE__ */ new Date()) {
   try {
     if (!LOCAL_HOST.test(win.location.hostname)) return;
-    const today = now.toISOString().slice(0, 10);
+    const today = localDay(now);
     if (win.localStorage.getItem(CHECKED_DATE_KEY) === today) return;
     win.localStorage.setItem(CHECKED_DATE_KEY, today);
     const response = await win.fetch(SDK_POLICY_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });

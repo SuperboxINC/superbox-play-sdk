@@ -1495,11 +1495,11 @@ function readJson(url, timeoutMs) {
     request.on("error", reject);
   });
 }
-async function checkSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
+async function inspectSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const configured = process.env[SDK_POLICY_URL_ENV];
-  if (configured === POLICY_OFF) return OK;
+  if (configured === POLICY_OFF) return { verdict: OK, policy: "off" };
   const policy = await readJson(configured || SDK_POLICY_URL, timeoutMs).then(parseSdkPolicy, () => null);
-  return policy ? evaluateSdkPolicy(policy, version) : OK;
+  return policy ? { verdict: evaluateSdkPolicy(policy, version), policy: "read" } : { verdict: OK, policy: "unreadable" };
 }
 
 // packages/package-core/src/node/verify.ts
@@ -1508,7 +1508,7 @@ var CHUNK_BYTES = 4 * 1024 * 1024;
 // engines/unity/superbox-play/package.json
 var package_default = {
   name: "com.superbox.play",
-  version: "0.2.1",
+  version: "0.2.2",
   licensesUrl: "https://github.com/SuperboxINC/superbox-play-sdk/blob/main/LICENSE",
   displayName: "Superbox Play SDK",
   description: "\uC288\uD37C\uBC15\uC2A4 \uD50C\uB808\uC774 \uAC8C\uC784\uC13C\uD130\uC6A9 Unity SDK\uC608\uC694. \uAD11\uACE0, \uC778\uC571 \uACB0\uC81C, \uB85C\uADF8\uC778, \uD3EC\uC778\uD2B8 \uBBF8\uC158, \uC548\uC804 \uC601\uC5ED\uC744 C#\uC73C\uB85C \uD638\uCD9C\uD574\uC694. WebGL \uBE4C\uB4DC\uC5D0\uC11C \uB3D9\uC791\uD558\uACE0 \uC5D0\uB514\uD130\uC5D0\uC11C\uB294 \uC2DC\uBBAC\uB808\uC774\uC158\uB3FC\uC694.",
@@ -1542,9 +1542,9 @@ function withPlayerSettings(config, request) {
   return { ...config, ...version === void 0 ? {} : { version }, ...title === void 0 ? {} : { title }, engine: "unity" };
 }
 async function unityPolicyAnswer() {
-  const verdict = await checkSdkPolicy(package_default.version);
-  if (verdict.kind === "ok") return { ok: true, blocked: false, message: "", latestVersion: "" };
-  return { ok: true, blocked: verdict.kind === "blocked", message: verdict.message, latestVersion: verdict.latestVersion };
+  const { verdict, policy } = await inspectSdkPolicy(package_default.version);
+  if (verdict.kind === "ok") return { ok: true, blocked: false, message: "", latestVersion: "", policy };
+  return { ok: true, blocked: verdict.kind === "blocked", message: verdict.message, latestVersion: verdict.latestVersion, policy };
 }
 async function loadUnityConfig(request) {
   const configPath = path4.join(request.projectDir, CONFIG_FILE);

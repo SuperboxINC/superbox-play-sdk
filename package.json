@@ -1,6 +1,6 @@
 {
   "name": "superbox-play-sdk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "슈퍼박스 플레이 게임 도구 — 패키지 CLI · Play SDK 타입 · Phaser 플러그인 · Cocos Creator 확장",
   "type": "module",

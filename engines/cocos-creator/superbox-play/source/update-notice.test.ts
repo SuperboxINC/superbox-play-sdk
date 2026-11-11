@@ -101,6 +101,31 @@ describe('Cocos 새 버전 알림', () => {
     assert.deepEqual(asked, []);
   });
 
+  it('정책을 읽지 못한 날은 확인한 날로 치지 않고, 다음에 켤 때 다시 본다', async () => {
+    await close();
+    close = await publishSdkPolicy({ minVersion: 'latest', recommendedVersion: '0.3.0' });
+    const { editor, asked } = fakeEditor(LATER);
+    await notifyUpdate({ editor, projectDir, version: '0.2.0', now: DAY });
+
+    await close();
+    close = await publishSdkPolicy({ minVersion: '0.1.0', recommendedVersion: '0.3.0' });
+    await notifyUpdate({ editor, projectDir, version: '0.2.0', now: DAY });
+
+    assert.equal(asked.length, 1);
+    assert.ok(asked[0]?.message.startsWith('새로운 SDK 버전이 있어요.'));
+  });
+
+  it('지원이 끝난 버전이면 그 까닭을 먼저 말한다', async () => {
+    await close();
+    close = await publishSdkPolicy({ minVersion: '0.3.0', recommendedVersion: '0.3.0' });
+    const { editor, asked } = fakeEditor(LATER);
+
+    await notifyUpdate({ editor, projectDir, version: '0.2.0', now: DAY });
+
+    assert.ok(asked[0]?.message.startsWith('이 도구 버전(0.2.0)은 지원이 끝났어요.'));
+    assert.ok(asked[0]?.message.includes('최신: v0.3.0'));
+  });
+
   it('대화상자가 실패해도 에디터로 오류를 던지지 않는다', async () => {
     const editor: UpdateNoticeEditor = {
       Dialog: { info: () => Promise.reject(new Error('no window')) },

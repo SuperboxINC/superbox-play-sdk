@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
-import { verifyPackageFile } from '../../../packages/package-core/src/index.ts';
+import { SDK_POLICY_URL_ENV, verifyPackageFile } from '../../../packages/package-core/src/index.ts';
 import { publishSdkPolicy } from '../../../packages/package-core/src/test-support.ts';
 import { packageUnityBuild, unityPolicyAnswer } from './package-build.ts';
 
@@ -26,13 +26,34 @@ describe('Unity 메뉴의 버전 정책', () => {
       assert.equal(answer.blocked, false);
       assert.ok(answer.message.includes('99.0.0'));
       assert.equal(answer.latestVersion, '99.0.0');
+      assert.equal(answer.policy, 'read');
     } finally {
       await close();
     }
   });
 
-  it('정책을 볼 수 없으면 막지 않고 할 말도 없다', async () => {
-    assert.deepEqual(await unityPolicyAnswer(), { ok: true, blocked: false, message: '', latestVersion: '' });
+  it('정책을 읽고 최신이면 할 말이 없다', async () => {
+    const close = await publishSdkPolicy({ minVersion: '0.0.1', recommendedVersion: '0.0.1' });
+    try {
+      assert.deepEqual(await unityPolicyAnswer(), { ok: true, blocked: false, message: '', latestVersion: '', policy: 'read' });
+    } finally {
+      await close();
+    }
+  });
+
+  it('정책을 읽지 못하면 막지 않고, 읽지 못했다고 답한다', async () => {
+    const previous = process.env[SDK_POLICY_URL_ENV];
+    process.env[SDK_POLICY_URL_ENV] = 'http://127.0.0.1:1/sdk-policy.json';
+    try {
+      assert.deepEqual(await unityPolicyAnswer(), { ok: true, blocked: false, message: '', latestVersion: '', policy: 'unreadable' });
+    } finally {
+      if (previous === undefined) delete process.env[SDK_POLICY_URL_ENV];
+      else process.env[SDK_POLICY_URL_ENV] = previous;
+    }
+  });
+
+  it('정책 확인을 끄면 막지 않고 할 말도 없다', async () => {
+    assert.deepEqual(await unityPolicyAnswer(), { ok: true, blocked: false, message: '', latestVersion: '', policy: 'off' });
   });
 });
 

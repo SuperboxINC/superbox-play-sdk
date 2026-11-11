@@ -45,6 +45,10 @@ namespace Superbox.Play.Editor
         public string message;
         public bool blocked;
         public string latestVersion;
+
+        /// <summary>정책을 어떻게 봤나 — <c>read</c> · <c>off</c> · <c>unreadable</c>. 비어 있으면 Node 가 답하지 못했다(시간 초과 · 깨진 스크립트).
+        /// 판정만으로는 「최신」과 「확인 못 함」이 같아서 에디터를 켤 때의 알림이 이것으로 다시 볼지 정한다.</summary>
+        public string policy;
     }
 
     /// <summary>패키지에 묶어 넣은 패키징 스크립트(CLI 와 같은 규칙)를 Node 로 실행한다. 요청은 파일로 넘긴다 — 명령줄은 한글 게임 이름을 깨뜨릴 수 있다.</summary>

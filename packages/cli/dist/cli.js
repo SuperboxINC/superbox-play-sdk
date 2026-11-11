@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 // packages/cli/package.json
 var package_default = {
   name: "@superbox-play/cli",
-  version: "0.2.1",
+  version: "0.2.2",
   description: "\uC288\uD37C\uBC15\uC2A4 \uD50C\uB808\uC774 \uAC8C\uC784 \uD328\uD0A4\uC9C0 \uB3C4\uAD6C \u2014 superbox-play init \xB7 build \xB7 inspect \xB7 dev",
   type: "module",
   license: "SEE LICENSE IN ../../LICENSE",
@@ -1552,11 +1552,14 @@ function readJson(url, timeoutMs) {
     request.on("error", reject);
   });
 }
-async function checkSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
+async function inspectSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const configured = process.env[SDK_POLICY_URL_ENV];
-  if (configured === POLICY_OFF) return OK;
+  if (configured === POLICY_OFF) return { verdict: OK, policy: "off" };
   const policy = await readJson(configured || SDK_POLICY_URL, timeoutMs).then(parseSdkPolicy, () => null);
-  return policy ? evaluateSdkPolicy(policy, version) : OK;
+  return policy ? { verdict: evaluateSdkPolicy(policy, version), policy: "read" } : { verdict: OK, policy: "unreadable" };
+}
+async function checkSdkPolicy(version, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  return (await inspectSdkPolicy(version, timeoutMs)).verdict;
 }
 
 // packages/package-core/src/node/verify.ts

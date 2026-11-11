@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer, type RequestListener, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, afterEach, describe, it } from 'node:test';
-import { checkSdkPolicy, SDK_POLICY_URL_ENV } from './sdk-policy-check.ts';
+import { checkSdkPolicy, inspectSdkPolicy, SDK_POLICY_URL_ENV } from './sdk-policy-check.ts';
 
 const POLICY = JSON.stringify({ schemaVersion: 1, minVersion: '0.2.0', recommendedVersion: '0.3.0', deniedVersions: [] });
 const SHORT_TIMEOUT_MS = 50;
@@ -65,6 +65,23 @@ describe('sdk policy check', () => {
       response.on('close', () => clearInterval(trickle));
     });
     assert.deepEqual(await checkSdkPolicy('0.1.0', SHORT_TIMEOUT_MS), { kind: 'ok' });
+  });
+
+  it('tells whether the policy was read, so a failed check is not taken for up to date', async () => {
+    await serve((_request, response) => response.end(POLICY));
+    assert.deepEqual(await inspectSdkPolicy('0.3.0'), { verdict: { kind: 'ok' }, policy: 'read' });
+    assert.equal((await inspectSdkPolicy('0.2.0')).policy, 'read');
+
+    process.env[SDK_POLICY_URL_ENV] = 'http://127.0.0.1:1/sdk-policy.json';
+    assert.deepEqual(await inspectSdkPolicy('0.3.0'), { verdict: { kind: 'ok' }, policy: 'unreadable' });
+
+    process.env[SDK_POLICY_URL_ENV] = 'off';
+    assert.deepEqual(await inspectSdkPolicy('0.3.0'), { verdict: { kind: 'ok' }, policy: 'off' });
+  });
+
+  it('does not take a broken policy for a read one', async () => {
+    await serve((_request, response) => response.end('{ broken'));
+    assert.equal((await inspectSdkPolicy('0.1.0')).policy, 'unreadable');
   });
 
   it('does not ask when the check is turned off', async () => {

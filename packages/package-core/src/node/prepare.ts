@@ -17,7 +17,7 @@ import {
   MAX_BUILD_FILES,
   PACKAGING_DIR,
 } from '../limits.ts';
-import { isPackageLabel, type EngineName, type LoadingMode, type Orientation } from '../manifest.ts';
+import { isPackageLabel, type AspectRange, type EngineName, type LoadingMode, type Orientation } from '../manifest.ts';
 import { warning } from '../warnings.ts';
 import { readUnityVersion } from './unity-version.ts';
 import { walkBuildFolder, type BuildFileEntry } from './walk.ts';
@@ -56,6 +56,8 @@ export interface PreparedBuild {
   readonly title: string | null;
   readonly version: string;
   readonly orientation: Orientation;
+  /** 설정의 aspectRange — 없으면 null(게임존이 틀을 무대 전부로 채운다) */
+  readonly aspectRange: AspectRange | null;
   readonly loading: { readonly mode: LoadingMode; readonly backgroundColor: string; readonly primaryColor: string };
   /** 입구는 주입이 끝난 내용, `sbp/` 는 패키징이 더한 파일. 경로 차례. */
   readonly files: readonly PreparedFile[];
@@ -216,6 +218,7 @@ export async function prepareBuild(options: PrepareOptions): Promise<PreparedBui
     title: config.title ?? null,
     version: config.version ?? DEFAULT_VERSION,
     orientation: config.orientation ?? 'auto',
+    aspectRange: config.aspectRange ?? null,
     loading,
     files: [...gameFiles, ...packagingFiles].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
     warnings,

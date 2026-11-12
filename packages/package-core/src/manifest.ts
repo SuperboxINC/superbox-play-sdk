@@ -2,6 +2,7 @@ import { PackageError } from './errors.ts';
 import {
   COLOR_PATTERN,
   FORMAT_VERSION,
+  isAspectRatio,
   isSafeBuildPath,
   isZoneOrigin,
   MAX_BUILD_BYTES,
@@ -34,12 +35,19 @@ export interface ManifestFile {
   readonly encoding: FileEncoding;
 }
 
+/** 게임이 받는 화면 비율 범위(가로 ÷ 세로, 2장) — 게임존이 게임 틀을 이 안에서 채운다. 없으면 null(무대 전부를 채운다) */
+export interface AspectRange {
+  readonly min: number;
+  readonly max: number;
+}
+
 export interface PackageManifest {
   readonly format: 1;
   readonly version: string;
   readonly entry: string;
   readonly title: string | null;
   readonly orientation: Orientation;
+  readonly aspectRange: AspectRange | null;
   readonly engine: { readonly name: EngineName; readonly version: string | null };
   readonly tool: { readonly name: string; readonly version: string };
   readonly zoneOrigin: string;
@@ -139,6 +147,16 @@ function pickColor(value: unknown, field: string): string {
   return value;
 }
 
+/** 없으면 null — 이 칸 전에 만든 패키지도 그대로 읽힌다 */
+function pickAspectRange(value: unknown): AspectRange | null {
+  if (value === null || value === undefined) return null;
+  const range = pickRecord(value, 'aspectRange');
+  if (!isAspectRatio(range.min)) throw invalid('aspectRange.min');
+  if (!isAspectRatio(range.max)) throw invalid('aspectRange.max');
+  if (range.min > range.max) throw invalid('aspectRange');
+  return { min: range.min, max: range.max };
+}
+
 /** 받은 JSON → 검증한 manifest. 틀리면 PackageError(칸 이름이 detail). */
 export function parseManifest(raw: unknown): PackageManifest {
   const value = pickRecord(raw, 'manifest');
@@ -166,6 +184,7 @@ export function parseManifest(raw: unknown): PackageManifest {
     entry,
     title: pickNullableTitle(value.title),
     orientation: pickEnum(ORIENTATIONS, value.orientation, 'orientation'),
+    aspectRange: pickAspectRange(value.aspectRange),
     engine: {
       name: pickEnum(ENGINE_NAMES, engine.name, 'engine.name'),
       version: pickNullableLabel(engine.version, 'engine.version'),

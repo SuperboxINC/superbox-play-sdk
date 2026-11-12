@@ -177,6 +177,19 @@ describe('createPackage', () => {
     }
   });
 
+  it('writes the aspect range from the config into the manifest, and none without it', async () => {
+    const folder = await makeFolder({ 'index.html': PLAIN_HTML, 'game.js': 'x' });
+    const ranged = await pack(folder, { config: { aspectRange: { min: 1.3333, max: 2.4 } } });
+    assert.deepEqual(ranged.manifest.aspectRange, { min: 1.3333, max: 2.4 });
+    const reopened = await openPackage(ranged.outPath);
+    try {
+      assert.deepEqual(reopened.opened.manifest.aspectRange, { min: 1.3333, max: 2.4 });
+    } finally {
+      await reopened.close();
+    }
+    assert.equal((await pack(folder)).manifest.aspectRange, null);
+  });
+
   it('adds the debug console only when asked, and warns', async () => {
     const folder = await makeFolder({ 'index.html': PLAIN_HTML, 'game.js': 'x' });
     const report = await pack(folder, { config: { runtime: { debugConsole: true } } });

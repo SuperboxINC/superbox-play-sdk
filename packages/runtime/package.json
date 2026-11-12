@@ -1,6 +1,6 @@
 {
   "name": "@superbox-play/runtime",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "license": "SEE LICENSE IN ../../LICENSE",
   "description": "게임 문서 안에 들어가는 부트 런타임과 기본 로딩 화면 — 빌드하면 문자열로 @superbox-play/package 에 들어간다",

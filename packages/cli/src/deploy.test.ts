@@ -200,7 +200,9 @@ describe('deploy flow', () => {
     assert.equal(body.version, '1.0.3');
     assert.equal(body.entryPath, 'index.html');
     assert.equal(body.note, '광고 지면 추가');
-    assert.deepEqual(Object.keys(body.package).sort(), ['createdAt', 'engine', 'format', 'loading', 'orientation', 'title', 'tool', 'zoneOrigin'].sort());
+    assert.deepEqual(Object.keys(body.package).sort(), ['aspectRange', 'createdAt', 'engine', 'format', 'loading', 'orientation', 'title', 'tool', 'zoneOrigin'].sort());
+    // 설정에 비율 범위가 없으면 null 로 싣는다(게임존이 틀을 무대 전부로 채운다)
+    assert.equal(body.package.aspectRange, null);
     assert.equal(body.package.title, '배포 시험');
     assert.equal(body.package.zoneOrigin, 'http://localhost:8200');
     assert.ok(body.files.every((file) => /^[0-9a-f]{64}$/.test(file.sha256)));

@@ -13,13 +13,22 @@ describe('parseConfig', () => {
       version: '1.0.3',
       title: '드랍 더 넘버',
       orientation: 'portrait',
+      aspectRange: { min: '9:21', max: '3:4' },
       engine: 'unity',
       loading: { backgroundColor: '#0B0F19', primaryColor: '#1B64DA', image: 'loading/logo.png', tips: ['블록을 합치면 점수가 올라요'], html: 'loading.html' },
       runtime: { earlyFetch: true, maxDevicePixelRatio: 'auto', watchdog: true, debugConsole: false },
     });
     assert.equal(config.title, '드랍 더 넘버');
     assert.equal(config.runtime?.maxDevicePixelRatio, 'auto');
+    assert.deepEqual(config.aspectRange, { min: 0.4286, max: 0.75 });
     assert.deepEqual(warnings, []);
+  });
+
+  it('reads the aspect range as width ÷ height — "W:H" text or a number, four decimals', () => {
+    assert.deepEqual(parseConfig({ aspectRange: { min: '4:3', max: '2.4:1' } }).config.aspectRange, { min: 1.3333, max: 2.4 });
+    assert.deepEqual(parseConfig({ aspectRange: { min: 1.33333, max: 2.4 } }).config.aspectRange, { min: 1.3333, max: 2.4 });
+    assert.deepEqual(parseConfig({ aspectRange: { min: ' 1:4 ', max: '4:1' } }).config.aspectRange, { min: 0.25, max: 4 });
+    assert.deepEqual(parseConfig({ aspectRange: { min: '16:9', max: '16:9' } }).config.aspectRange, { min: 1.7778, max: 1.7778 });
   });
 
   it('every field is optional', () => {
@@ -44,14 +53,24 @@ describe('parseConfig', () => {
     failsOn({ runtime: { watchdog: 'yes' } }, 'runtime.watchdog');
     failsOn({ runtime: { maxDevicePixelRatio: 9 } }, 'runtime.maxDevicePixelRatio');
     failsOn({ runtime: { maxDevicePixelRatio: 'high' } }, 'runtime.maxDevicePixelRatio');
+    failsOn({ aspectRange: '4:3' }, 'aspectRange');
+    failsOn({ aspectRange: { min: '4:3' } }, 'aspectRange.max');
+    failsOn({ aspectRange: { min: 'wide', max: '2:1' } }, 'aspectRange.min');
+    failsOn({ aspectRange: { min: '4:0', max: '2:1' } }, 'aspectRange.min');
+    failsOn({ aspectRange: { min: '-4:3', max: '2:1' } }, 'aspectRange.min');
+    failsOn({ aspectRange: { min: '1:5', max: '2:1' } }, 'aspectRange.min');
+    failsOn({ aspectRange: { min: 1, max: 4.5 } }, 'aspectRange.max');
+    failsOn({ aspectRange: { min: 1, max: Number.POSITIVE_INFINITY } }, 'aspectRange.max');
+    failsOn({ aspectRange: { min: '2:1', max: '4:3' } }, 'aspectRange');
   });
 
   it('warns about unknown keys, which may be typos', () => {
-    const { warnings } = parseConfig({ titel: 'x', loading: { tip: [] }, runtime: { watchDog: true }, $schema: 'x' });
-    assert.equal(warnings.length, 3);
+    const { warnings } = parseConfig({ titel: 'x', loading: { tip: [] }, runtime: { watchDog: true }, aspectRange: { min: '4:3', max: '2:1', step: 1 }, $schema: 'x' });
+    assert.equal(warnings.length, 4);
     assert.ok(warnings.every((item) => item.code === 'CONFIG_UNKNOWN_KEY'));
     assert.ok(warnings[0]?.message.includes('titel'));
     assert.ok(warnings[1]?.message.includes('loading.tip'));
+    assert.ok(warnings[3]?.message.includes('aspectRange.step'));
   });
 });
 

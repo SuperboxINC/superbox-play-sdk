@@ -22,6 +22,12 @@ describe('parseManifest', () => {
     assert.equal('future' in manifest, false);
   });
 
+  it('reads the aspect range — null when the package has none (packages before it)', () => {
+    assert.equal(parseManifest(sampleManifest()).aspectRange, null);
+    assert.equal(parseManifest(sampleManifest({ aspectRange: null })).aspectRange, null);
+    assert.deepEqual(parseManifest(sampleManifest({ aspectRange: { min: 1.3333, max: 2.4, step: 1 } })).aspectRange, { min: 1.3333, max: 2.4 });
+  });
+
   it('accepts null title and null engine version', () => {
     const manifest = parseManifest(sampleManifest({ title: null, engine: { name: 'unity', version: null } }));
     assert.equal(manifest.title, null);
@@ -82,6 +88,12 @@ describe('parseManifest', () => {
     failsOn(ONE_FILE({ sha256: 'a'.repeat(63) }), 'files[0].sha256');
     failsOn(ONE_FILE({ size: 1.5 }), 'files[0].size');
     failsOn(ONE_FILE({ encoding: 'zstd' }), 'files[0].encoding');
+    failsOn({ aspectRange: 'wide' }, 'aspectRange');
+    failsOn({ aspectRange: { min: 1.3333 } }, 'aspectRange.max');
+    failsOn({ aspectRange: { min: '4:3', max: 2.4 } }, 'aspectRange.min');
+    failsOn({ aspectRange: { min: 0.1, max: 2 } }, 'aspectRange.min');
+    failsOn({ aspectRange: { min: 1, max: 5 } }, 'aspectRange.max');
+    failsOn({ aspectRange: { min: 2.4, max: 1.3333 } }, 'aspectRange');
   });
 
   it('refuses unsafe, reserved and duplicate paths, and an entry outside the files', () => {

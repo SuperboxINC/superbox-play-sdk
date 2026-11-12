@@ -123,6 +123,15 @@ var DEFAULT_BACKGROUND_COLOR = "#0B0F19";
 var DEFAULT_PRIMARY_COLOR = "#1B64DA";
 var VERSION_PATTERN = /^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/;
 var COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
+var MIN_ASPECT_RATIO = 0.25;
+var MAX_ASPECT_RATIO = 4;
+var ASPECT_RATIO_SCALE = 1e4;
+function roundAspectRatio(value) {
+  return Math.round(value * ASPECT_RATIO_SCALE) / ASPECT_RATIO_SCALE;
+}
+function isAspectRatio(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= MIN_ASPECT_RATIO && value <= MAX_ASPECT_RATIO;
+}
 var SAFE_PATH_CHARS = /^[A-Za-z0-9._\-/ ()@]+$/;
 function isSafeBuildPath(path6) {
   if (!path6 || path6.length > MAX_PATH_LENGTH || !SAFE_PATH_CHARS.test(path6)) return false;
@@ -217,9 +226,11 @@ var MAX_TIP_LENGTH = 80;
 var MAX_PATH_LENGTH2 = 255;
 var MIN_PIXEL_RATIO = 0.5;
 var MAX_PIXEL_RATIO = 4;
-var TOP_KEYS = ["version", "title", "orientation", "engine", "loading", "runtime"];
+var TOP_KEYS = ["version", "title", "orientation", "aspectRange", "engine", "loading", "runtime"];
 var LOADING_KEYS = ["backgroundColor", "primaryColor", "image", "tips", "html"];
 var RUNTIME_KEYS = ["earlyFetch", "maxDevicePixelRatio", "watchdog", "debugConsole"];
+var ASPECT_RANGE_KEYS = ["min", "max"];
+var RATIO_TEXT = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/;
 function invalid(field) {
   return new PackageError("CONFIG_INVALID", field);
 }
@@ -264,6 +275,27 @@ function parsePixelRatio(value) {
   }
   return value;
 }
+function ratioOfText(value) {
+  const match = RATIO_TEXT.exec(value.trim());
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  return height > 0 ? width / height : null;
+}
+function parseAspectRatio(value, field) {
+  const ratio = typeof value === "number" ? value : typeof value === "string" ? ratioOfText(value) : null;
+  const rounded = ratio === null || !Number.isFinite(ratio) ? null : roundAspectRatio(ratio);
+  if (!isAspectRatio(rounded)) throw invalid(field);
+  return rounded;
+}
+function parseAspectRange(value) {
+  if (value === void 0) return void 0;
+  if (!isRecord(value)) throw invalid("aspectRange");
+  const min = parseAspectRatio(value.min, "aspectRange.min");
+  const max = parseAspectRatio(value.max, "aspectRange.max");
+  if (min > max) throw invalid("aspectRange");
+  return { min, max };
+}
 function withoutUndefined(value) {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== void 0));
 }
@@ -281,6 +313,7 @@ function parseConfig(raw) {
     version,
     title,
     orientation: optionalEnum(ORIENTATIONS, raw.orientation, "orientation"),
+    aspectRange: parseAspectRange(raw.aspectRange),
     engine: optionalEnum(ENGINE_NAMES, raw.engine, "engine"),
     loading: loading ? withoutUndefined({
       backgroundColor: optionalColor(loading.backgroundColor, "loading.backgroundColor"),
@@ -301,7 +334,8 @@ function parseConfig(raw) {
     warnings: [
       ...unknownKeys(raw, TOP_KEYS, ""),
       ...loading ? unknownKeys(loading, LOADING_KEYS, "loading.") : [],
-      ...runtime ? unknownKeys(runtime, RUNTIME_KEYS, "runtime.") : []
+      ...runtime ? unknownKeys(runtime, RUNTIME_KEYS, "runtime.") : [],
+      ...isRecord(raw.aspectRange) ? unknownKeys(raw.aspectRange, ASPECT_RANGE_KEYS, "aspectRange.") : []
     ]
   };
 }
@@ -846,6 +880,7 @@ async function prepareBuild(options) {
     title: config.title ?? null,
     version: config.version ?? DEFAULT_VERSION,
     orientation: config.orientation ?? "auto",
+    aspectRange: config.aspectRange ?? null,
     loading,
     files: [...gameFiles, ...packagingFiles].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
     warnings

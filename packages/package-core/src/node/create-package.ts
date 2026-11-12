@@ -108,6 +108,7 @@ export async function createPackage(options: CreatePackageOptions): Promise<Pack
     entry: prepared.entry,
     title: prepared.title,
     orientation: prepared.orientation,
+    aspectRange: prepared.aspectRange,
     engine: prepared.engine,
     tool: options.tool,
     zoneOrigin,

@@ -22,6 +22,7 @@ export function manifestSummary(manifest: PackageManifest, packageBytes: number)
     `이름     ${manifest.title ?? '(없음)'}`,
     `엔진     ${manifest.engine.name}${manifest.engine.version ? ` ${manifest.engine.version}` : ''}`,
     `방향     ${manifest.orientation}`,
+    `비율     ${manifest.aspectRange ? `${manifest.aspectRange.min} ~ ${manifest.aspectRange.max} (가로 ÷ 세로)` : '제한 없음'}`,
     `게임존   ${manifest.zoneOrigin}`,
     `로딩     ${manifest.loading.mode} · 바탕 ${manifest.loading.backgroundColor} · 강조 ${manifest.loading.primaryColor}`,
     `도구     ${manifest.tool.name} ${manifest.tool.version}`,

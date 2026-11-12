@@ -1,6 +1,14 @@
 import { PackageError, type PackageWarning } from './errors.ts';
-import { COLOR_PATTERN, VERSION_PATTERN } from './limits.ts';
-import { ENGINE_NAMES, isSafeTitle, ORIENTATIONS, type EngineName, type LoadingMode, type Orientation } from './manifest.ts';
+import { COLOR_PATTERN, isAspectRatio, roundAspectRatio, VERSION_PATTERN } from './limits.ts';
+import {
+  ENGINE_NAMES,
+  isSafeTitle,
+  ORIENTATIONS,
+  type AspectRange,
+  type EngineName,
+  type LoadingMode,
+  type Orientation,
+} from './manifest.ts';
 import { warning } from './warnings.ts';
 
 /**
@@ -28,6 +36,8 @@ export interface SuperboxConfig {
   readonly version?: string;
   readonly title?: string;
   readonly orientation?: Orientation;
+  /** 게임이 받는 화면 비율(가로 ÷ 세로) — 파일에는 "4:3" 같은 글자나 숫자로 적고, 읽으면 숫자다(소수 넷째 자리) */
+  readonly aspectRange?: AspectRange;
   readonly engine?: EngineName;
   readonly loading?: SuperboxLoadingConfig;
   readonly runtime?: SuperboxRuntimeConfig;
@@ -45,9 +55,12 @@ const MAX_PATH_LENGTH = 255;
 const MIN_PIXEL_RATIO = 0.5;
 const MAX_PIXEL_RATIO = 4;
 
-const TOP_KEYS = ['version', 'title', 'orientation', 'engine', 'loading', 'runtime'];
+const TOP_KEYS = ['version', 'title', 'orientation', 'aspectRange', 'engine', 'loading', 'runtime'];
 const LOADING_KEYS = ['backgroundColor', 'primaryColor', 'image', 'tips', 'html'];
 const RUNTIME_KEYS = ['earlyFetch', 'maxDevicePixelRatio', 'watchdog', 'debugConsole'];
+const ASPECT_RANGE_KEYS = ['min', 'max'];
+/** 「가로:세로」 — 4:3 · 2.4:1 · 9:21 */
+const RATIO_TEXT = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/;
 
 function invalid(field: string): PackageError {
   return new PackageError('CONFIG_INVALID', field);
@@ -104,6 +117,31 @@ function parsePixelRatio(value: unknown): number | 'auto' | undefined {
   return value;
 }
 
+function ratioOfText(value: string): number | null {
+  const match = RATIO_TEXT.exec(value.trim());
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  return height > 0 ? width / height : null;
+}
+
+/** 비율 하나 — 숫자(가로 ÷ 세로)나 "가로:세로" 글자. 소수 넷째 자리로 맞춘 뒤 1:4 ~ 4:1 안이어야 한다 */
+function parseAspectRatio(value: unknown, field: string): number {
+  const ratio = typeof value === 'number' ? value : typeof value === 'string' ? ratioOfText(value) : null;
+  const rounded = ratio === null || !Number.isFinite(ratio) ? null : roundAspectRatio(ratio);
+  if (!isAspectRatio(rounded)) throw invalid(field);
+  return rounded;
+}
+
+function parseAspectRange(value: unknown): AspectRange | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw invalid('aspectRange');
+  const min = parseAspectRatio(value.min, 'aspectRange.min');
+  const max = parseAspectRatio(value.max, 'aspectRange.max');
+  if (min > max) throw invalid('aspectRange');
+  return { min, max };
+}
+
 function withoutUndefined<T extends object>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
 }
@@ -125,6 +163,7 @@ export function parseConfig(raw: unknown): ParsedConfig {
     version,
     title,
     orientation: optionalEnum(ORIENTATIONS, raw.orientation, 'orientation'),
+    aspectRange: parseAspectRange(raw.aspectRange),
     engine: optionalEnum(ENGINE_NAMES, raw.engine, 'engine'),
     loading: loading
       ? withoutUndefined({
@@ -151,6 +190,7 @@ export function parseConfig(raw: unknown): ParsedConfig {
       ...unknownKeys(raw, TOP_KEYS, ''),
       ...(loading ? unknownKeys(loading, LOADING_KEYS, 'loading.') : []),
       ...(runtime ? unknownKeys(runtime, RUNTIME_KEYS, 'runtime.') : []),
+      ...(isRecord(raw.aspectRange) ? unknownKeys(raw.aspectRange, ASPECT_RANGE_KEYS, 'aspectRange.') : []),
     ],
   };
 }

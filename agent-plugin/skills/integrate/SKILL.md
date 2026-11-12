@@ -22,6 +22,7 @@ SDK의 메서드 이름과 인자는 기억으로 쓰지 말고 코드를 쓰기
 | 공유 | `/sdk/reference`의 ‘공유 · 링크’ |
 | 사전예약 보상 | `/launch/prereg` |
 | 화면 방향과 안전 영역 | `/sdk/screen` |
+| 넓거나 좁은 화면의 비율 | `/package/config`의 ‘화면 비율’ |
 | 메서드 전체 | `/sdk/reference` |
 | 오류 코드 | `/sdk/errors` |
 

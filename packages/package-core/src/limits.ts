@@ -24,6 +24,22 @@ export const DEFAULT_PRIMARY_COLOR = '#1B64DA';
 export const VERSION_PATTERN = /^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/;
 export const COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 
+/**
+ * 게임이 받는 화면 비율(가로 ÷ 세로)의 바깥 끝 — 1:4 ~ 4:1(설정 · manifest 의 aspectRange, 2장 · 3장). 게임존은 게임 틀을 이 범위 안에서 채운다.
+ * 값은 소수 넷째 자리까지(4:3 → 1.3333). 서버(api build-package.rules)와 같은 범위다
+ */
+export const MIN_ASPECT_RATIO = 0.25;
+export const MAX_ASPECT_RATIO = 4;
+const ASPECT_RATIO_SCALE = 10_000;
+
+export function roundAspectRatio(value: number): number {
+  return Math.round(value * ASPECT_RATIO_SCALE) / ASPECT_RATIO_SCALE;
+}
+
+export function isAspectRatio(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= MIN_ASPECT_RATIO && value <= MAX_ASPECT_RATIO;
+}
+
 // `@` — Cocos Creator 3 의 서브 에셋 파일 이름(`uuid@b47c0@bb97f.jpg`). 실제 빌드에 들어 있어 빼면 Cocos 게임을 올릴 수 없다
 const SAFE_PATH_CHARS = /^[A-Za-z0-9._\-/ ()@]+$/;
 

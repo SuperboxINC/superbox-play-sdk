@@ -101,6 +101,7 @@ function packageSummary(manifest: PackageManifest): Readonly<Record<string, unkn
     tool: manifest.tool,
     zoneOrigin: manifest.zoneOrigin,
     orientation: manifest.orientation,
+    aspectRange: manifest.aspectRange,
     title: manifest.title,
     loading: manifest.loading,
     createdAt: manifest.createdAt,

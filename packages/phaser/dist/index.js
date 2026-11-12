@@ -85,7 +85,7 @@ function evaluateSdkPolicy(policy, version) {
 }
 
 // packages/phaser/src/update-notice.ts
-var PLUGIN_VERSION = "0.2.6";
+var PLUGIN_VERSION = "0.2.7";
 function localDay(now) {
   const pad = (value) => String(value).padStart(2, "0");
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;

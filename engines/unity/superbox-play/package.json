@@ -1,6 +1,6 @@
 {
   "name": "com.superbox.play",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "licensesUrl": "https://github.com/SuperboxINC/superbox-play-sdk/blob/main/LICENSE",
   "displayName": "Superbox Play SDK",
   "description": "슈퍼박스 플레이 게임센터용 Unity SDK예요. 광고, 인앱 결제, 로그인, 포인트 미션, 안전 영역을 C#으로 호출해요. WebGL 빌드에서 동작하고 에디터에서는 시뮬레이션돼요.",

@@ -1576,7 +1576,7 @@ var CHUNK_BYTES = 4 * 1024 * 1024;
 var package_default = {
   package_version: 2,
   name: "superbox-play",
-  version: "0.2.6",
+  version: "0.2.7",
   title: "Superbox Play",
   description: "web-mobile \xB7 web-desktop \uBE4C\uB4DC\uB97C \uC288\uD37C\uBC15\uC2A4 \uD50C\uB808\uC774 \uD328\uD0A4\uC9C0(.sbp)\uB85C \uBB36\uACE0 \uAC8C\uC784 \uCF54\uB4DC\uC5D0\uC11C SuperboxPlay \uB97C \uC4F0\uAC8C \uD55C\uB2E4",
   author: "SUPERBOX",

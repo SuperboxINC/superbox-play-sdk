@@ -1553,7 +1553,7 @@ var CHUNK_BYTES = 4 * 1024 * 1024;
 // engines/unity/superbox-play/package.json
 var package_default = {
   name: "com.superbox.play",
-  version: "0.2.6",
+  version: "0.2.7",
   licensesUrl: "https://github.com/SuperboxINC/superbox-play-sdk/blob/main/LICENSE",
   displayName: "Superbox Play SDK",
   description: "\uC288\uD37C\uBC15\uC2A4 \uD50C\uB808\uC774 \uAC8C\uC784\uC13C\uD130\uC6A9 Unity SDK\uC608\uC694. \uAD11\uACE0, \uC778\uC571 \uACB0\uC81C, \uB85C\uADF8\uC778, \uD3EC\uC778\uD2B8 \uBBF8\uC158, \uC548\uC804 \uC601\uC5ED\uC744 C#\uC73C\uB85C \uD638\uCD9C\uD574\uC694. WebGL \uBE4C\uB4DC\uC5D0\uC11C \uB3D9\uC791\uD558\uACE0 \uC5D0\uB514\uD130\uC5D0\uC11C\uB294 \uC2DC\uBBAC\uB808\uC774\uC158\uB3FC\uC694.",
